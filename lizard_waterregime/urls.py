@@ -6,9 +6,19 @@ from django.contrib import admin
 
 admin.autodiscover()
 
+crumb_waterregime = {'name': 'waterregime', 'url': '/waterregime/', 'title': 'Water Regime'}
+
+
 urlpatterns = patterns(
     '',
     (r'^admin/', include(admin.site.urls)),
+    # waterregime urls
+    (r'^$',
+     'lizard_waterregime.views.start',
+     {'crumbs_prepend': list(crumb_waterregime),
+      },
+     'waterregime_start'),
+
     )
 
 
@@ -17,3 +27,4 @@ if settings.DEBUG:
     urlpatterns += patterns('',
         (r'', include('staticfiles.urls')),
     )
+
