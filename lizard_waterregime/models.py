@@ -9,7 +9,7 @@ class WaterRegimeShape(models.Model):
     gid = models.IntegerField(primary_key=True)
     afdeling = models.CharField(max_length=5)
     naam = models.CharField(max_length=50)
-    area_m2 = models.DecimalField(max_digits=65535, decimal_places=65535)
+    area_m2 = models.DecimalField(max_digits=20, decimal_places=10)
     the_geom = models.MultiPolygonField(srid=-1)
     objects = models.GeoManager()
     class Meta:
