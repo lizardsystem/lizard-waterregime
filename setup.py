@@ -14,6 +14,7 @@ install_requires = [
     'django-staticfiles',
     'django-extensions',
     'lizard-ui',
+    'timeseries',
     'django-nose',
     'pkginfo',
     ],
