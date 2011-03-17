@@ -10,7 +10,7 @@ from django.core.urlresolvers import reverse
 #from django.core.cache import cache
 #from django.http import HttpResponse
 #from django.http import HttpResponseRedirect
-#from django.shortcuts import get_object_or_404
+from django.shortcuts import get_object_or_404
 from django.shortcuts import render_to_response
 from django.template import RequestContext
 #from django.utils import simplejson
@@ -23,7 +23,7 @@ from django.template import RequestContext
 #from lizard_map.adapter import Graph
 #from lizard_map.daterange import current_start_end_dates
 #from lizard_map.daterange import DateRangeForm
-#from lizard_map.models import Workspace
+from lizard_map.models import Workspace
 #from timeseries.timeseriesstub import TimeseriesStub
 #from timeseries.timeseriesstub import grouped_event_values
 #from timeseries.timeseriesstub import multiply_timeseries
