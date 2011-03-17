@@ -32,7 +32,7 @@ import hotshot
 import os
 
 def start(request,
-          template='lizard_waterregime/waterregime_start.html',
+          template='lizard_waterregime/lizard_waterregime.html',
           crumbs_prepend=None):
     """Show waterbalance overview workspace.
 
@@ -42,7 +42,6 @@ def start(request,
     * crumbs_prepend -- list of breadcrumbs
 
     """
-    waterbalance_areas = WaterbalanceArea.objects.all()
 
     if crumbs_prepend is None:
         crumbs = [{'name': 'home', 'url': '/'}]
@@ -51,16 +50,14 @@ def start(request,
 
     crumbs.append({'name': 'Waterregime',
                    'title': 'Water Regime',
-                   'url': reverse('/waterregime/')})
+                   'url': reverse('waterregime_start')})
 
-    special_homepage_workspace = \
-        get_object_or_404(Workspace, pk=WATERBALANCE_HOMEPAGE_KEY)
     return render_to_response(
         template,
-        {'waterbalance_areas': waterbalance_areas,
-         'workspaces': {'user': [special_homepage_workspace]},
-         'javascript_hover_handler': 'popup_hover_handler',
-         'javascript_click_handler': 'waterbalance_area_click_handler',
-         'crumbs': crumbs},
+        {
+            'javascript_hover_handler': 'popup_hover_handler',
+            'javascript_click_handler': 'waterbalance_area_click_handler',
+            'crumbs': crumbs
+        },
         context_instance=RequestContext(request))
 
