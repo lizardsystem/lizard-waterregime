@@ -1,21 +1,33 @@
-{# Summary view: small map on the left to show selection; graphs on the right #}
 {% extends "lizard_map/wms.html" %}
 {% load workspaces %}
 
-{% block subtitle %} Waterregime home {% endblock %}
+{% block subtitle %} Waterregime {% endblock %}
 
 {% block sidebar %}
 <div class="sidebarbox sidebarbox-stretched">
-  <h2>Waterregime gebieden</h2>
-  <p>
-    Maak een keuze uit de peilgebieden
-  </p>
-  <ul class="without-bullets">
-    {% for waterbalance_area in waterbalance_areas %}
+  <h2>Waterregime tree</h2>
+  <ul class="automatic-tree filetree">
     <li>
-      <a href="{{ waterbalance_area.get_absolute_url }}">{{ waterbalance_area.name }}</a>
+      <span class="folder">Waterregime folder</span>
+      <ul>
+        <li class="workspace-acceptable file"
+            data-name="regimedata"
+            data-adapter-class="adapter_waterregime"
+            data-adapter-layer-json='{"layer": "regimelayer"}'>
+          Waterregimeblabla
+        </li>
+      </ul>
     </li>
-    {% endfor %}
   </ul>
 </div>
+
+<div class="sidebarbox sidebarbox-stretched">
+</div>
+
+{% for workspace in workspaces.user %}
+  {% workspace workspace %}
+{% empty %}
+No workspace
+{% endfor %}
+
 {% endblock %}
