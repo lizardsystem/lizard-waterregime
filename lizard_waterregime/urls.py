@@ -6,7 +6,7 @@ from django.contrib import admin
 admin.autodiscover()
 
 urlpatterns = patterns('',
-    url(r'^$', 'start', name='lizard_waterregime.views.waterregime_start'),
+    url(r'^$', 'lizard_waterregime.views.start', name='waterregime_start'),
 )
 
 if settings.DEBUG:
