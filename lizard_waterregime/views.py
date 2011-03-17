@@ -49,7 +49,7 @@ def start(request,
         crumbs = list(crumbs_prepend)
 
     crumbs.append({'name': 'Waterregime',
-                   'title': 'Water Regime',
+                   'title': 'Waterregime',
                    'url': reverse('waterregime_start')})
 
     return render_to_response(
