@@ -3,23 +3,16 @@ from django.conf.urls.defaults import *
 from django.conf import settings
 from django.contrib import admin
 
-
 admin.autodiscover()
 
-crumb_home = [{'name': 'Home', 'url': '/', 'title': 'Hoofdpagina'}]
-
-
-urlpatterns = patterns(
-    '',
-    (r'^admin/', include(admin.site.urls)),
+urlpatterns = patterns('',
     # waterregime urls
-    (r'^$','lizard_waterregime.views.start',{},'waterregime_start'),
+    url(r'^$', 'lizard_waterregime.views.start', name='waterregime_start'),
 )
-
 
 if settings.DEBUG:
     # Add this also to the projects that use this application
     urlpatterns += patterns('',
         (r'', include('staticfiles.urls')),
+        (r'^admin/', include(admin.site.urls)),
     )
-
