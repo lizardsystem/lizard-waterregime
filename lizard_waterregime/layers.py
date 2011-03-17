@@ -1,10 +1,10 @@
 from lizard_map.workspace import WorkspaceItemAdapter
 
-class AdapterWaterbalance(WorkspaceItemAdapter):
-    """Adapter for module LizardWaterbalance.
+class AdapterWaterRegime(WorkspaceItemAdapter):
+    """Adapter for module lizard_waterregime.
 
-    Registered as adapter_waterbalance.
+    Registered as adapter_waterregime.
 
-    Uses default database table "waterbalance_shape" as geo database.
+    Uses default database table "water_regime_shape" as geo database.
     """
 

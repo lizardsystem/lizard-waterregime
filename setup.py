@@ -45,7 +45,7 @@ setup(name='lizard-waterregime',
           'console_scripts': [
             ],
           'lizard_map.adapter_class': [
-            'adapter_waterregime = lizard_waterregime.layers:AdapterWaterregime',
+            'adapter_waterregime = lizard_waterregime.layers:AdapterWaterRegime',
             ],
           },
       )
