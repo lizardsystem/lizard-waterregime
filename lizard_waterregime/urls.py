@@ -6,7 +6,8 @@ from django.contrib import admin
 
 admin.autodiscover()
 
-crumb_waterregime = {'name': 'waterregime', 'url': '/waterregime/', 'title': 'Water Regime'}
+#crumb_waterregime = {'name': 'waterregime', 'url': '/waterregime/', 'title': 'Water Regime'}
+crumb_home = [{'name': 'Home', 'url': '/', 'title': 'Hoofdpagina'}]
 
 
 urlpatterns = patterns(
@@ -15,7 +16,7 @@ urlpatterns = patterns(
     # waterregime urls
     (r'^$',
      'lizard_waterregime.views.start',
-     {'crumbs_prepend': list(crumb_waterregime),
+     {'crumbs_prepend': list(crumb_home),
       },
      'waterregime_start'),
 
