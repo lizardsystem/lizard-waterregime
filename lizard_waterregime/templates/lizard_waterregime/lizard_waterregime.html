@@ -5,23 +5,17 @@
 
 {% block sidebar %}
 <div class="sidebarbox sidebarbox-stretched">
-  <h2>Waterregime tree</h2>
-  <ul class="automatic-tree filetree">
-    <li>
-      <span class="folder">Waterregime folder</span>
-      <ul>
-        <li class="workspace-acceptable file"
-            data-name="regimedata"
-            data-adapter-class="adapter_waterregime"
-            data-adapter-layer-json='{"layer": "regimelayer"}'>
-          Waterregimeblabla
-        </li>
-      </ul>
-    </li>
-  </ul>
-</div>
-
-<div class="sidebarbox sidebarbox-stretched">
+  <h2>Waterregime</h2>
+    <ul class="without-bullets">
+      {% for shape in waterregime_shapes %}
+      <li class="workspace-acceptable"
+          data-name="{{ shape.gid }}"
+          data-adapter-class="adapter_waterregime"
+          data-adapter-layer-json='{"layer": "{{ shape.gid }}"}'>
+        <a href="#">{{ shape.afdeling }}</a>
+      </li>
+      {% endfor %}
+    </ul>
 </div>
 
 {% for workspace in workspaces.user %}
