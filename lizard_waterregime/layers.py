@@ -49,7 +49,7 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
         return mapnik_style
 
     def layer(self, layer_ids=None, request=None):
-        """Generates and returns mapnik layers and styles.
+        """ Generates and returns mapnik layers and styles.
         """
         
         layers = []
@@ -57,7 +57,8 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
 
         db_settings = settings.DATABASES['default']
         gid = self.layer_arguments["layer"]
-#        table_view = '(select gid, the_geom, 100 as value from water_regime_shape where gid=%s) result_view' % gid
+#       table_view = ('(select gid, the_geom, 100 as value from '
+#                     'water_regime_shape where gid=%s) result_view' % gid)
         table_view = ('(select gid, the_geom, gid * 30 as value '
                       'from water_regime_shape) result_view')
 
