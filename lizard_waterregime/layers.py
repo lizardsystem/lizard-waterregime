@@ -17,7 +17,7 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
         Temp function to return a default mapnik style
         """
 
-        def mapnik_rule(r, g, b, a, mapnik_filter=None):
+        def mapnik_rule(r, g, b, mapnik_filter=None):
             """
             Makes mapnik rule for looks. For lines and polygons.
 
@@ -26,26 +26,25 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
             rule = mapnik.Rule()
             if mapnik_filter is not None:
                 rule.filter = mapnik.Filter(mapnik_filter)
-            mapnik_color = mapnik.Color(r, g, b, a)
-            mapnik_stroke_color = mapnik.Color(r, g, b)
+            mapnik_color = mapnik.Color(r, g, b)
 
-            symb_line = mapnik.LineSymbolizer(mapnik_stroke_color, 1)
+            symb_line = mapnik.LineSymbolizer(mapnik_color, 2)
             rule.symbols.append(symb_line)
 
             symb_poly = mapnik.PolygonSymbolizer(mapnik_color)
-            symb_poly.fill_opacity = .8
+            symb_poly.fill_opacity = .2
             rule.symbols.append(symb_poly)
             return rule
 
         mapnik_style = mapnik.Style()
-        rule = mapnik_rule(255, 255, 0, 128)
+        rule = mapnik_rule(255, 255, 0)
         mapnik_style.rules.append(rule)
         # for gid in range(100):
         #     rule = mapnik_rule(0, 10 * gid ,0, '[gid] = %d' % gid)
         #     mapnik_style.rules.append(rule)
-        rule = mapnik_rule(0, 255, 0, 128, '[value] <= 75')
+        rule = mapnik_rule(0, 0, 255, '[value] <= 75')
         mapnik_style.rules.append(rule)
-        rule = mapnik_rule(255, 0, 0, 128, '[value] > 75')
+        rule = mapnik_rule(255, 0, 0, '[value] > 75')
         mapnik_style.rules.append(rule)
         return mapnik_style
 
@@ -59,7 +58,8 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
         db_settings = settings.DATABASES['default']
         gid = self.layer_arguments["layer"]
 #        table_view = '(select gid, the_geom, 100 as value from water_regime_shape where gid=%s) result_view' % gid
-        table_view = '(select gid, the_geom, gid * 30 as value from water_regime_shape) result_view'
+        table_view = ('(select gid, the_geom, gid * 30 as value '
+                      'from water_regime_shape) result_view')
 
         layer = mapnik.Layer('Geometry from PostGIS')
         layer.srs = RD  #GOOGLE
