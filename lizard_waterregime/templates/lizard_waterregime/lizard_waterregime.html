@@ -7,14 +7,12 @@
 <div class="sidebarbox sidebarbox-stretched">
   <h2>Waterregime</h2>
     <ul class="without-bullets">
-      {% for shape in waterregime_shapes %}
       <li class="workspace-acceptable"
-          data-name="{{ shape.gid }}"
+          data-name="Regime-indicator"
           data-adapter-class="adapter_waterregime"
-          data-adapter-layer-json='{"layer": "{{ shape.gid }}"}'>
-        <a href="#">{{ shape.afdeling }}</a>
+          data-adapter-layer-json='{"layer": "testlayername432"}'>
+        <a href="#">Regime-indicator</a>
       </li>
-      {% endfor %}
     </ul>
 </div>
 

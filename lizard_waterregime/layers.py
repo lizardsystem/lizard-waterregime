@@ -1,5 +1,6 @@
 import mapnik
 from django.conf import settings
+from lizard_map import coordinates
 from lizard_map.coordinates import RD
 from lizard_map.workspace import WorkspaceItemAdapter
 
@@ -28,7 +29,7 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
                 rule.filter = mapnik.Filter(mapnik_filter)
             mapnik_color = mapnik.Color(r, g, b)
 
-            symb_line = mapnik.LineSymbolizer(mapnik_color, 2)
+            symb_line = mapnik.LineSymbolizer(mapnik_color, 1)
             rule.symbols.append(symb_line)
 
             symb_poly = mapnik.PolygonSymbolizer(mapnik_color)
@@ -56,12 +57,17 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
         styles = {}
 
         db_settings = settings.DATABASES['default']
-        gid = self.layer_arguments["layer"]
-#       table_view = ('(select gid, the_geom, 100 as value from '
-#                     'water_regime_shape where gid=%s) result_view' % gid)
-        table_view = ('(select gid, the_geom, gid * 30 as value '
-                      'from water_regime_shape) result_view')
-
+        table_view = """ (
+            select
+                gid,
+                afdeling,
+                naam,
+                area_m2,
+                the_geom,
+                gid * 30 as value
+            from
+                water_regime_shape) result_view
+        """
         layer = mapnik.Layer('Geometry from PostGIS')
         layer.srs = RD  #GOOGLE
         layer.datasource = mapnik.PostGIS(
@@ -78,3 +84,53 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
         styles[style_name] = mapnik_style
 
         return layers, styles
+        
+    def search(self, google_x, google_y, radius=None):
+        """ Search by coordinates, return matching items as list of dicts
+
+        Required in result:
+            distance, name, workspace_item, google_coords
+        Highly recommended (else some functions will not work):
+            identifier (for popups)
+
+        Hacky at the moment as searching shapefiles is harder than
+        expected. Copied from lizard_map.layers.py """
+
+        result = []
+
+        # Set up a basic map as only map can search...
+        mapnik_map = mapnik.Map(400, 400)
+        mapnik_map.srs = coordinates.GOOGLE
+
+        layers, styles = self.layer()
+        for layer in layers:
+            mapnik_map.layers.append(layer)
+        for name in styles:
+            mapnik_map.append_style(name, styles[name])
+        # 0 is the first layer.
+        feature_set = mapnik_map.query_point(0, google_x, google_y)
+
+        for feature in feature_set.features:
+            afdeling = feature.properties['afdeling']
+            gid = feature.properties['gid']
+            popup_string = '<br />'.join([
+                afdeling,
+                'Area: %s km2' % int(feature.properties['area_m2'] * 10e-6),
+                'Value: %s' % feature.properties['value'],
+            ])
+            identifier = {
+                'afdeling': afdeling,
+                'google_x': google_x,
+                'google_y': google_y,
+            }
+            single_result = {
+                'distance': 0.0,
+                'object': gid,
+                'name': popup_string,
+                'shortname': afdeling,
+                'google_coords': (google_x, google_y),
+                'workspace_item': self.workspace_item,
+                'identifier': identifier,
+            }
+            result.append(single_result)
+        return result        
