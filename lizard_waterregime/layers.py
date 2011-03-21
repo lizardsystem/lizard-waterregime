@@ -17,7 +17,7 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
         Temp function to return a default mapnik style
         """
 
-        def mapnik_rule(r, g, b, mapnik_filter=None):
+        def mapnik_rule(r, g, b, a, mapnik_filter=None):
             """
             Makes mapnik rule for looks. For lines and polygons.
 
@@ -26,25 +26,26 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
             rule = mapnik.Rule()
             if mapnik_filter is not None:
                 rule.filter = mapnik.Filter(mapnik_filter)
-            mapnik_color = mapnik.Color(r, g, b)
+            mapnik_color = mapnik.Color(r, g, b, a)
+            mapnik_stroke_color = mapnik.Color(r, g, b)
 
-            symb_line = mapnik.LineSymbolizer(mapnik_color, 0)
+            symb_line = mapnik.LineSymbolizer(mapnik_stroke_color, 1)
             rule.symbols.append(symb_line)
 
             symb_poly = mapnik.PolygonSymbolizer(mapnik_color)
-            symb_poly.fill_opacity = 1
+            symb_poly.fill_opacity = .8
             rule.symbols.append(symb_poly)
             return rule
 
         mapnik_style = mapnik.Style()
-        rule = mapnik_rule(255, 255, 0)
+        rule = mapnik_rule(255, 255, 0, 128)
         mapnik_style.rules.append(rule)
         # for gid in range(100):
         #     rule = mapnik_rule(0, 10 * gid ,0, '[gid] = %d' % gid)
         #     mapnik_style.rules.append(rule)
-        rule = mapnik_rule(0, 255, 0, '[value] <= 75')
+        rule = mapnik_rule(0, 255, 0, 128, '[value] <= 75')
         mapnik_style.rules.append(rule)
-        rule = mapnik_rule(255, 0, 0, '[value] > 75')
+        rule = mapnik_rule(255, 0, 0, 128, '[value] > 75')
         mapnik_style.rules.append(rule)
         return mapnik_style
 
