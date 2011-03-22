@@ -1,5 +1,6 @@
-import os
+import logging
 import mapnik
+import os
 from datetime import datetime
 
 from django.conf import settings
@@ -13,7 +14,7 @@ from lizard_map.symbol_manager import SymbolManager
 
 from lizard_waterregime.models import WaterRegimeShape
 
-
+log = logging.getLogger('nens.waterregimeadapter')
 
 class AdapterWaterRegime(WorkspaceItemAdapter):
     """Adapter for module lizard_waterregime.
@@ -23,12 +24,32 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
     Uses default database table "water_regime_shape" as geo database.
     """
 
+    COLOR = {
+    # zeer droog komt niet voor in grenswaardentabel
+    #   'zeer droog':(226, 108,  10),
+        'droog'     :(249, 191, 143),
+        'gemiddeld' :(219, 229, 241),
+        'nat'       :(149, 179, 215),
+        'zeer nat'  :( 53,  95, 145),
+    }
+    # nu gebaseerd op gewogen neerslagoverschot (p-e?)
+    # alleen geldig binnen groeiseizoen, zie grenswaardentabel
+
+    FILTER = {
+    # zeer droog komt niet voor in grenswaardentabel
+    #    'zeer droog':'                 [value] <= -4',
+         'droog'     :'                 [value] <= -4', 
+         'gemiddeld' :'[value] > -4 and [value] <=  7', 
+         'nat'       :'[value] >  7 and [value] <= 10', 
+         'zeer nat'  :'[value] >  10                 ', 
+    }
+
     def _mapnik_style(self):
         """
         Temp function to return a default mapnik style
         """
 
-        def mapnik_rule(r, g, b, mapnik_filter=None):
+        def mapnik_rule(color, mapnik_filter=None):
             """
             Makes mapnik rule for looks. For lines and polygons.
 
@@ -37,44 +58,39 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
             rule = mapnik.Rule()
             if mapnik_filter is not None:
                 rule.filter = mapnik.Filter(mapnik_filter)
-            mapnik_color = mapnik.Color(r, g, b)
+            mapnik_color = mapnik.Color(*color)
 
-            symb_line = mapnik.LineSymbolizer(mapnik_color, 1)
+            symb_line = mapnik.LineSymbolizer(mapnik_color, 2)
             rule.symbols.append(symb_line)
 
             symb_poly = mapnik.PolygonSymbolizer(mapnik_color)
-            symb_poly.fill_opacity = .2
+            symb_poly.fill_opacity = .8
             rule.symbols.append(symb_poly)
             return rule
 
         mapnik_style = mapnik.Style()
-        rule = mapnik_rule(255, 255, 0)
-        mapnik_style.rules.append(rule)
-        # for gid in range(100):
-        #     rule = mapnik_rule(0, 10 * gid ,0, '[gid] = %d' % gid)
-        #     mapnik_style.rules.append(rule)
-        rule = mapnik_rule(0, 0, 255, '[value] <= 75')
-        mapnik_style.rules.append(rule)
-        rule = mapnik_rule(255, 0, 0, '[value] > 75')
-        mapnik_style.rules.append(rule)
+        mapnik_style.rules.extend([
+            mapnik_rule(self.COLOR[key],self.FILTER[key])
+            for key in self.COLOR.keys()
+        ])
         return mapnik_style
 
     def layer(self, layer_ids=None, request=None):
-        """ Generates and returns mapnik layers and styles.
+        """Generates and returns mapnik layers and styles.
         """
         
         layers = []
         styles = {}
 
         db_settings = settings.DATABASES['default']
-        table_view = """ (
+        table_view = """(
             select
                 gid,
                 afdeling,
                 naam,
                 area_m2,
                 the_geom,
-                gid * 30 as value
+                gid * 5 - 12 as value
             from
                 water_regime_shape) result_view
         """
@@ -96,7 +112,7 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
         return layers, styles
         
     def search(self, google_x, google_y, radius=None):
-        """ Search by coordinates, return matching items as list of dicts
+        """Search by coordinates, return matching items as list of dicts
 
         Required in result:
             distance, name, workspace_item, google_coords
@@ -159,7 +175,7 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
             layout_options=layout_options)        
             
     def location(self, afdeling, google_x, google_y, layout=None):
-        """ Lookup 'peilgebied' by 'afdeling'
+        """Lookup 'peilgebied' by 'afdeling'
 
         """
         shape = WaterRegimeShape.objects.get(afdeling=afdeling)
@@ -193,13 +209,11 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
         if height is None:
             height = 170.0
 
-
-
         graph = adapter.Graph(start_date, end_date, width, height)
         graph.add_today()
 
         # Find database object that contains the timeseries data.
-        """ From fewsunblobbed:
+        """From fewsunblobbed:
         timeserie = fews_timeserie(
             self.filterkey,
             identifier['locationkey'],
@@ -243,4 +257,31 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
             }
         output_filename = sm.get_symbol_transformed(icon_style['icon'],
                                                     **icon_style)
-        return settings.MEDIA_URL + 'generated_icons/' + output_filename        
+        return settings.MEDIA_URL + 'generated_icons/' + output_filename   
+        
+    def legend(self, updates=None):
+        """Return a legend in a list of dictionaries."""
+
+        legend_result = []
+
+        for key in self.COLOR.keys():
+            log.debug(key)
+            log.debug(self.COLOR[key])
+            color = [component/255. for component in self.COLOR[key]]
+            log.debug(color)
+            color.append(1)
+            log.debug(color)
+            img_url = self.symbol_url(
+                icon_style = {
+                    'icon': 'empty.png',
+                    'color': color,
+                }
+            )
+            description = key
+            legend_result.append({
+                'img_url': img_url, 
+                'description': description,
+            })
+       
+        return legend_result
+
