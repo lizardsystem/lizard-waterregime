@@ -1,12 +1,18 @@
+import os
 import mapnik
 from datetime import datetime
 
 from django.conf import settings
 from lizard_map import coordinates
 from lizard_map import adapter
+from lizard_map.models import ICON_ORIGINALS
+
 from lizard_map.coordinates import RD
 from lizard_map.workspace import WorkspaceItemAdapter
+from lizard_map.symbol_manager import SymbolManager
+
 from lizard_waterregime.models import WaterRegimeShape
+
 
 
 class AdapterWaterRegime(WorkspaceItemAdapter):
@@ -119,7 +125,7 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
             gid = feature.properties['gid']
             popup_string = '<br />'.join([
                 afdeling,
-                'Area: %s km2' % int(feature.properties['area_m2'] * 10e-6),
+                u'Area: %i km\u00b2' % round(feature.properties['area_m2'] * 1e-6),
                 'Value: %s' % feature.properties['value'],
             ])
             identifier = {
@@ -204,11 +210,37 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
          """
 
         # Plot testdata.
-        from numpy import sin
+        from numpy import sin, cos
         from numpy import arange
 
         dates = [datetime(2011,3,x) for x in range(1,20)]
-        values = [float(y) for y in sin(arange(1,20))]
 
-        graph.axes.plot(dates, values)
+        values1 = [float(y) for y in sin(arange(1,20)/4.)]
+        values2 = [float(y) for y in cos(arange(1,20)/4.)]
+        values3 = [a-b for a,b in zip(values1,values2)]
+
+        graph.axes.plot(dates, values1)
+        graph.axes.plot(dates, values2)
+        graph.axes.plot(dates, values3)
+
+
         return graph.http_png()
+        
+    def symbol_url(self, identifier=None, start_date=None, end_date=None,
+                   icon_style=None):
+        """Return symbol for identifier.
+
+        Implementation: respect the fact when icon_style is already
+        given. If it's empty, generate own icon if applicable.
+        """
+        sm = SymbolManager(ICON_ORIGINALS, os.path.join(
+                settings.MEDIA_ROOT,
+                'generated_icons'))
+        if icon_style is None:
+            icon_style = {
+                'icon': 'empty.png',
+                'color': (1.0,0.5,0.5,0),
+            }
+        output_filename = sm.get_symbol_transformed(icon_style['icon'],
+                                                    **icon_style)
+        return settings.MEDIA_URL + 'generated_icons/' + output_filename        
