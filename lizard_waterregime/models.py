@@ -4,14 +4,91 @@
 # Create your models here.
 
 from django.contrib.gis.db import models
+from lizard_fewsunblobbed.models import Filter
+from lizard_fewsunblobbed.models import Location
+from lizard_fewsunblobbed.models import Parameter
+from lizard_fewsunblobbed.models import Timeserie
+
 
 class WaterRegimeShape(models.Model):
     gid = models.IntegerField(primary_key=True)
     afdeling = models.CharField(max_length=5)
     naam = models.CharField(max_length=50)
     area_m2 = models.DecimalField(max_digits=20, decimal_places=10)
-    the_geom = models.MultiPolygonField(srid=-1)
+    the_geom = models.MultiPolygonField(srid= -1)
     objects = models.GeoManager()
-    class Meta:
-        db_table = u'water_regime_shape'
 
+
+class TimeSeriesFactory(models.Model):
+    """
+    """
+    series_name = models.CharField(max_length=64, unique=True)
+    class_name = models.CharField(max_length=64)
+    
+    def get_timeseries(self):
+        return eval(self.class_name).objects.get(name=self.series_name)
+
+
+class DefaultTimeSeries(models.Model):
+    """ Represents a time series, i.e. a sequence of time series
+    events (or data points) measured at successive times.
+    Data is physically located in the default database.
+    """
+    name = models.CharField(max_length=64, unique=True)
+
+    def events(self):
+        """
+        """
+        for event in self.timeseriesevent_set.all():
+            yield event.datetime, event.value
+
+
+class TimeSeriesEvent(models.Model):
+    """ Represents a value measured at a particular point in
+    time. Successive events together form a time series.
+    """
+    time_series = models.ForeignKey(DefaultTimeSeries)
+    datetime = models.DateTimeField()
+    value = models.FloatField()
+
+    class Meta:
+        unique_together = (("time_series", "datetime"),)
+        ordering = ("datetime",)
+
+
+class FewsTimeSeries(models.Model):
+    """ Represents a time series, i.e. a sequence of time series
+    events (or data points) measured at successive times.
+    Data is physically located in the fews database.
+    """
+    name = models.CharField(max_length=64, unique=True)
+    ## By design, a fews time series is not uniquely defined by
+    ## fid, lid, and pid. The next 2 fields are required too?
+    moduleinstanceid = models.CharField(max_length=64)
+    timestep = models.CharField(max_length=64)
+    ## Alternative keys are stored instead of the primary keys,
+    ## because the former are considered more stable.
+    fid = models.CharField(max_length=64)
+    lid = models.CharField(max_length=64)
+    pid = models.CharField(max_length=64)
+
+    def events(self):
+        """
+        """
+        fpk = Filter.objects.get(id=self.fid).pk
+        lpk = Location.objects.get(id=self.lid).pk
+        ppk = Parameter.objects.get(id=self.pid).pk
+
+        timeseries = Timeserie.objects.get(
+            moduleinstanceid=self.moduleinstanceid,
+            timestep=self.timestep,
+            filterkey=fpk,
+            locationkey=lpk,
+            parameterkey=ppk)
+
+        for event in timeseries.timeseriesdata.all().order_by('tsd_time'):
+            yield event.tsd_time, event.tsd_value
+
+    class Meta:
+        unique_together = (("moduleinstanceid", "timestep",
+            "fid", "lid", "pid"),)
