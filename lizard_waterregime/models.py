@@ -24,9 +24,15 @@ class TimeSeriesFactory(models.Model):
     """
     series_name = models.CharField(max_length=64, unique=True)
     class_name = models.CharField(max_length=64)
-    
-    def get_timeseries(self):
-        return eval(self.class_name).objects.get(name=self.series_name)
+
+    @classmethod
+    def get(cls, series_name):
+        """ Factory method that returns a time series. In this way, clients
+        can remain ignorant to the concrete class and database used. For
+        example: events = TimeSeriesFactory.get("DEBIET").events()
+        """
+        class_name = cls.objects.get(series_name=series_name).class_name
+        return eval(class_name).objects.get(name=series_name)
 
 
 class DefaultTimeSeries(models.Model):
