@@ -24,24 +24,49 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
     Uses default database table "water_regime_shape" as geo database.
     """
 
+    REGIMES = [{
+    # zeer droog komt niet voor in grenswaardentabel
+    # nu gebaseerd op gewogen neerslagoverschot (p-e?)
+    # alleen geldig binnen groeiseizoen, zie grenswaardentabel
+        'regime': 'Zeer droog',
+        'color': (226, 108,  10),
+        'filter': '[value] <= -400',
+    },{
+        'regime': 'Droog',
+        'color': (249, 191, 143),
+        'filter': '[value] <= -4',
+    },{
+        'regime': 'Gemiddeld',
+        'color': (219, 229, 241),
+        'filter': '[value] > -4 and [value] <=  7',
+    },{
+        'regime': 'Nat',
+        'color': (149, 179, 215),
+        'filter': '[value] >  7 and [value] <= 10', 
+    },{
+        'regime': 'Zeer nat',
+        'color': ( 53,  95, 145),
+        'filter': '[value] >  10', 
+    }]
+
     COLOR = {
     # zeer droog komt niet voor in grenswaardentabel
-    #   'zeer droog':(226, 108,  10),
-        'droog'     :(249, 191, 143),
-        'gemiddeld' :(219, 229, 241),
-        'nat'       :(149, 179, 215),
-        'zeer nat'  :( 53,  95, 145),
+        'Zeer droog':(226, 108,  10),
+        'Droog'     :(249, 191, 143),
+        'Gemiddeld' :(219, 229, 241),
+        'Nat'       :(149, 179, 215),
+        'Zeer nat'  :( 53,  95, 145),
     }
     # nu gebaseerd op gewogen neerslagoverschot (p-e?)
     # alleen geldig binnen groeiseizoen, zie grenswaardentabel
 
     FILTER = {
     # zeer droog komt niet voor in grenswaardentabel
-    #    'zeer droog':'                 [value] <= -4',
-         'droog'     :'                 [value] <= -4', 
-         'gemiddeld' :'[value] > -4 and [value] <=  7', 
-         'nat'       :'[value] >  7 and [value] <= 10', 
-         'zeer nat'  :'[value] >  10                 ', 
+        'Zeer droog':'                 [value] <= -400',
+        'Droog'     :'                 [value] <= -4', 
+        'Gemiddeld' :'[value] > -4 and [value] <=  7', 
+        'Nat'       :'[value] >  7 and [value] <= 10', 
+        'Zeer nat'  :'[value] >  10                 ', 
     }
 
     def _mapnik_style(self):
@@ -70,8 +95,8 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
 
         mapnik_style = mapnik.Style()
         mapnik_style.rules.extend([
-            mapnik_rule(self.COLOR[key],self.FILTER[key])
-            for key in self.COLOR.keys()
+            mapnik_rule(regime['color'],regime['filter'])
+            for regime in self.REGIMES
         ])
         return mapnik_style
 
@@ -253,7 +278,7 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
         if icon_style is None:
             icon_style = {
                 'icon': 'empty.png',
-                'color': (1.0,0.5,0.5,0),
+                'color': (0.5,1.0,0.5,0),
             }
         output_filename = sm.get_symbol_transformed(icon_style['icon'],
                                                     **icon_style)
@@ -264,20 +289,16 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
 
         legend_result = []
 
-        for key in self.COLOR.keys():
-            log.debug(key)
-            log.debug(self.COLOR[key])
-            color = [component/255. for component in self.COLOR[key]]
-            log.debug(color)
+        for regime in self.REGIMES:
+            color = [component/255. for component in regime['color']]
             color.append(1)
-            log.debug(color)
             img_url = self.symbol_url(
                 icon_style = {
                     'icon': 'empty.png',
                     'color': color,
                 }
             )
-            description = key
+            description = regime['regime']
             legend_result.append({
                 'img_url': img_url, 
                 'description': description,
