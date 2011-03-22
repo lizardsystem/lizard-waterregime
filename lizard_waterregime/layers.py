@@ -1,8 +1,12 @@
 import mapnik
+from datetime import datetime
+
 from django.conf import settings
 from lizard_map import coordinates
+from lizard_map import adapter
 from lizard_map.coordinates import RD
 from lizard_map.workspace import WorkspaceItemAdapter
+from lizard_waterregime.models import WaterRegimeShape
 
 
 class AdapterWaterRegime(WorkspaceItemAdapter):
@@ -133,4 +137,78 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
                 'identifier': identifier,
             }
             result.append(single_result)
-        return result        
+        return result
+        
+    def html(self, snippet_group=None, identifiers=None, layout_options=None):
+        """
+        Html output for given identifiers. Optionally layout_options
+        can be provided. Default layout_options:
+
+        layout_options = {'add_snippet': False,
+                         'editing': False}
+        """
+        return super(AdapterWaterRegime, self).html_default(
+            snippet_group=snippet_group,
+            identifiers=identifiers,
+            layout_options=layout_options)        
+            
+    def location(self, afdeling, google_x, google_y, layout=None):
+        """ Lookup 'peilgebied' by 'afdeling'
+
+        """
+        shape = WaterRegimeShape.objects.get(afdeling=afdeling)
+        gid = shape.gid
+        identifier = {
+            'afdeling': afdeling,
+            'google_x': google_x,
+            'google_y': google_y,
+        }
+
+        return {
+            'name': 'Peilgebied: ' + afdeling,
+            'shortname': afdeling,
+            'object': None, # what object? --  TODO?
+            'workspace_item': self.workspace_item,
+            'google_coords': (google_x, google_y),
+            'identifier': identifier,
+            }
+
+    def image(self, identifier_list,
+              start_date, end_date,
+              width=None, height=None,
+              layout_extra=None):
+        """
+        visualizes scores or measures in a graph
+
+        each row is an area
+        """
+        if width is None:
+            width = 380.0
+        if height is None:
+            height = 170.0
+
+
+
+        graph = adapter.Graph(start_date, end_date, width, height)
+        graph.add_today()
+
+        # Find database object that contains the timeseries data.
+        """ From fewsunblobbed:
+        timeserie = fews_timeserie(
+            self.filterkey,
+            identifier['locationkey'],
+            self.parameterkey)
+        timeseriedata = timeserie.timeseriedata.filter(
+            tsd_time__gte=start_date,
+            tsd_time__lte=end_date)
+         """
+
+        # Plot testdata.
+        from numpy import sin
+        from numpy import arange
+
+        dates = [datetime(2011,3,x) for x in range(1,20)]
+        values = [float(y) for y in sin(arange(1,20))]
+
+        graph.axes.plot(dates, values)
+        return graph.http_png()
