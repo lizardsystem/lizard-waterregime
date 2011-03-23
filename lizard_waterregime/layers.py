@@ -3,18 +3,19 @@ import mapnik
 import os
 from datetime import datetime
 
+from django.core.urlresolvers import reverse
 from django.conf import settings
+
 from lizard_map import coordinates
 from lizard_map import adapter
 from lizard_map.models import ICON_ORIGINALS
-
 from lizard_map.coordinates import RD
 from lizard_map.workspace import WorkspaceItemAdapter
 from lizard_map.symbol_manager import SymbolManager
 
 from lizard_waterregime.models import WaterRegimeShape
 
-log = logging.getLogger('nens.waterregimeadapter')
+logger = logging.getLogger('nens.waterregimeadapter')
 
 class AdapterWaterRegime(WorkspaceItemAdapter):
     """Adapter for module lizard_waterregime.
@@ -62,7 +63,7 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
 
     FILTER = {
     # zeer droog komt niet voor in grenswaardentabel
-        'Zeer droog':'                 [value] <= -400',
+        'Zeer droog':'                 [value] <= -9999',
         'Droog'     :'                 [value] <= -4', 
         'Gemiddeld' :'[value] > -4 and [value] <=  7', 
         'Nat'       :'[value] >  7 and [value] <= 10', 
@@ -164,11 +165,10 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
         for feature in feature_set.features:
             afdeling = feature.properties['afdeling']
             gid = feature.properties['gid']
-            popup_string = '<br />'.join([
-                afdeling,
-                u'Area: %i km\u00b2' % round(feature.properties['area_m2'] * 1e-6),
-                'Value: %s' % feature.properties['value'],
-            ])
+            popup_string = (
+                'Peilgebied %s, waarde: %i' % (
+                    afdeling, feature.properties['value'])
+            )
             identifier = {
                 'afdeling': afdeling,
                 'google_x': google_x,
@@ -194,10 +194,26 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
         layout_options = {'add_snippet': False,
                          'editing': False}
         """
+
+        graph_img_url = reverse(
+            "lizard_waterregime.workspace_item_graph_image",
+            kwargs={'workspace_item_id': self.workspace_item.id},
+            )
+        bar_img_url = reverse(
+            "lizard_waterregime.workspace_item_bar_image",
+            kwargs={'workspace_item_id': self.workspace_item.id},
+            )
+
         return super(AdapterWaterRegime, self).html_default(
             snippet_group=snippet_group,
             identifiers=identifiers,
-            layout_options=layout_options)        
+            layout_options=layout_options,
+            template='lizard_waterregime/popup.html',
+            extra_render_kwargs={
+                'graph_img_url':graph_img_url,
+                'bar_img_url':bar_img_url,
+            }
+        )        
             
     def location(self, afdeling, google_x, google_y, layout=None):
         """Lookup 'peilgebied' by 'afdeling'
@@ -220,7 +236,7 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
             'identifier': identifier,
             }
 
-    def image(self, identifier_list,
+    def graph_image(self, identifier_list,
               start_date, end_date,
               width=None, height=None,
               layout_extra=None):
@@ -264,6 +280,8 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
 
 
         return graph.http_png()
+
+    bar_image = graph_image
         
     def symbol_url(self, identifier=None, start_date=None, end_date=None,
                    icon_style=None):
