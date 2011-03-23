@@ -31,44 +31,43 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
     # alleen geldig binnen groeiseizoen, zie grenswaardentabel
         'regime': 'Zeer droog',
         'color': (226, 108,  10),
-        'filter': '[value] <= -400',
+        'lower_limit': None,
+        'upper_limit': -400,
     },{
         'regime': 'Droog',
         'color': (249, 191, 143),
-        'filter': '[value] <= -4',
+        'lower_limit': None,
+        'upper_limit': -4,
     },{
         'regime': 'Gemiddeld',
         'color': (219, 229, 241),
-        'filter': '[value] > -4 and [value] <=  7',
+        'lower_limit': -4,
+        'upper_limit': 7,
     },{
         'regime': 'Nat',
         'color': (149, 179, 215),
-        'filter': '[value] >  7 and [value] <= 10', 
+        'lower_limit': 7,
+        'upper_limit': 10,
     },{
         'regime': 'Zeer nat',
         'color': ( 53,  95, 145),
-        'filter': '[value] >  10', 
+        'lower_limit': 10,
+        'upper_limit': None,
     }]
+    
+    # Generate mapnik filters
+    for regime in REGIMES:
+        filter =''
+        if regime['lower_limit']:
+            filter += '[value] > ' + str(regime['lower_limit'])
+        if regime['lower_limit'] and regime['upper_limit']:
+            filter += ' and '
+        if regime['upper_limit']:
+            filter += '[value] <= ' + str(regime['upper_limit'])
+        regime['mapnik_filter'] = filter    
+        
+        
 
-    COLOR = {
-    # zeer droog komt niet voor in grenswaardentabel
-        'Zeer droog':(226, 108,  10),
-        'Droog'     :(249, 191, 143),
-        'Gemiddeld' :(219, 229, 241),
-        'Nat'       :(149, 179, 215),
-        'Zeer nat'  :( 53,  95, 145),
-    }
-    # nu gebaseerd op gewogen neerslagoverschot (p-e?)
-    # alleen geldig binnen groeiseizoen, zie grenswaardentabel
-
-    FILTER = {
-    # zeer droog komt niet voor in grenswaardentabel
-        'Zeer droog':'                 [value] <= -9999',
-        'Droog'     :'                 [value] <= -4', 
-        'Gemiddeld' :'[value] > -4 and [value] <=  7', 
-        'Nat'       :'[value] >  7 and [value] <= 10', 
-        'Zeer nat'  :'[value] >  10                 ', 
-    }
 
     def _mapnik_style(self):
         """
@@ -96,7 +95,7 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
 
         mapnik_style = mapnik.Style()
         mapnik_style.rules.extend([
-            mapnik_rule(regime['color'],regime['filter'])
+            mapnik_rule(regime['color'],regime['mapnik_filter'])
             for regime in self.REGIMES
         ])
         return mapnik_style
@@ -278,11 +277,51 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
         graph.axes.plot(dates, values2)
         graph.axes.plot(dates, values3)
 
-
         return graph.http_png()
 
-    bar_image = graph_image
+    def bar_image(self, identifier_list, start_date, end_date,              
+        width=None, height=None, layout_extra=None):
+        """Return a colored bar representing the regime against the time."""
+
+        if width is None:
+            width = 380.0
+        if height is None:
+            height = 170.0
+
+        # Data TODO get with real data...
+        from numpy.random import rand
+        from numpy import arange
+        dates = [datetime(2011,3,x) for x in range(1,30)]
+        values = [int(round(y)) for y in 20*rand(29)-4]
+
+
+        graph = adapter.Graph(start_date, end_date, width, height)
+        graph.add_today()
+
+        # Make a nice broken_barh:
+        """
+        Loop this:
+        ax.broken_barh([ (date, ), (150, 10) ] , (10, 9), facecolor=(0,0,0))
+
+        xranges = [(date.replace(hour=1),
+            date.replace(hour=23)) for date in dates]
+        facecolors=
+        yrange = ()   
+        c
         
+        #Value to color function: Just loop the regimes every time? Seems slow to me.
+        [list of ranges around date.]
+        list of colors
+                
+        graph.axes.broken_barh([ (10, 50), (100, 20),  (130, 10)] , (20, 9),
+                        facecolors=('red', 'yellow', 'green'))
+        graph.axes.set_ylim(0,10)
+        graph.axes.set_yticks([5])
+        graph.axes.set_yticklabels(['Regime'])
+        """
+
+        return graph.http_png()        
+
     def symbol_url(self, identifier=None, start_date=None, end_date=None,
                    icon_style=None):
         """Return symbol for identifier.
