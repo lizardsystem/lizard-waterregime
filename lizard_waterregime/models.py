@@ -3,6 +3,7 @@
 
 # Create your models here.
 
+from datetime import datetime
 from django.contrib.gis.db import models
 from lizard_fewsunblobbed.models import Filter
 from lizard_fewsunblobbed.models import Location
@@ -20,7 +21,7 @@ class WaterRegimeShape(models.Model):
 
 
 class TimeSeriesFactory(models.Model):
-    """
+    """ Factory class responsible for creating time series.
     """
     series_name = models.CharField(max_length=64, unique=True)
     class_name = models.CharField(max_length=64)
@@ -42,10 +43,11 @@ class DefaultTimeSeries(models.Model):
     """
     name = models.CharField(max_length=64, unique=True)
 
-    def events(self):
+    def events(self, start=datetime.min, end=datetime.max):
         """
         """
-        for event in self.timeseriesevent_set.all():
+        for event in self.timeseriesevent_set.filter(
+            datetime__range=(start, end)):
             yield event.datetime, event.value
 
 
@@ -78,7 +80,7 @@ class FewsTimeSeries(models.Model):
     lid = models.CharField(max_length=64)
     pid = models.CharField(max_length=64)
 
-    def events(self):
+    def events(self, start=datetime.min, end=datetime.max):
         """
         """
         fpk = Filter.objects.get(id=self.fid).pk
@@ -92,7 +94,8 @@ class FewsTimeSeries(models.Model):
             locationkey=lpk,
             parameterkey=ppk)
 
-        for event in timeseries.timeseriesdata.all().order_by('tsd_time'):
+        for event in timeseries.timeseriesdata.filter(
+            tsd_time__range=(start, end)).order_by('tsd_time'):
             yield event.tsd_time, event.tsd_value
 
     class Meta:
