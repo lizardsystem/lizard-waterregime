@@ -117,7 +117,7 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
                 the_geom,
                 gid * 5 - 12 as value
             from
-                water_regime_shape) result_view
+                lizard_waterregime_waterregimeshape) result_view
         """
         layer = mapnik.Layer('Geometry from PostGIS')
         layer.srs = RD  #GOOGLE
