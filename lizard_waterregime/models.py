@@ -20,6 +20,40 @@ class WaterRegimeShape(models.Model):
     objects = models.GeoManager()
 
 
+class LandType(models.Model):
+    """ Type of land. For example: corn, forest, water, etc.
+    """
+    name = models.CharField(max_length=64, unique=True)
+
+
+class LandUse(models.Model):
+    """ Each geographical region can be subdivided into smaller areas
+    according to the type of land, for example: province Utrecht has
+    2% corn, 10% forest, etc. The class LandUse describes how much
+    a type of land contributes to a total region (in % area).
+    """
+    region = models.ForeignKey(WaterRegimeShape)
+    type = models.ForeignKey(LandType)
+    fraction = models.FloatField()
+
+    class Meta:
+        unique_together = (("region", "type"),)
+
+
+class CropFactor(models.Model):
+    """ Factor to correct the evaporation of a reference area for a
+    certain vegetation. Since vegetation is a seasonal feature,
+    crop factors generally do vary over the days of a year.
+    """
+    crop = models.ForeignKey(LandType)
+    month = models.PositiveSmallIntegerField()
+    day = models.PositiveSmallIntegerField()
+    factor = models.FloatField()
+
+    class Meta:
+        unique_together = (("crop", "month", "day"),)
+
+
 class TimeSeriesFactory(models.Model):
     """ Factory class responsible for creating time series.
     """
@@ -30,7 +64,7 @@ class TimeSeriesFactory(models.Model):
     def get(cls, series_name):
         """ Factory method that returns a time series. In this way, clients
         can remain ignorant to the concrete class and database used. For
-        example: events = TimeSeriesFactory.get("DEBIET").events()
+        example: events = TimeSeriesFactory.get("P").events()
         """
         class_name = cls.objects.get(series_name=series_name).class_name
         return eval(class_name).objects.get(name=series_name)
