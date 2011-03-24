@@ -2,6 +2,8 @@ import logging
 import mapnik
 import os
 from datetime import datetime
+from datetime import timedelta
+from matplotlib.dates import date2num
 
 from django.core.urlresolvers import reverse
 from django.conf import settings
@@ -30,27 +32,27 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
     # nu gebaseerd op gewogen neerslagoverschot (p-e?)
     # alleen geldig binnen groeiseizoen, zie grenswaardentabel
         'regime': 'Zeer droog',
-        'color': (226, 108,  10),
+        'color_255': (226, 108,  10),
         'lower_limit': None,
         'upper_limit': -400,
     },{
         'regime': 'Droog',
-        'color': (249, 191, 143),
+        'color_255': (249, 191, 143),
         'lower_limit': None,
         'upper_limit': -4,
     },{
         'regime': 'Gemiddeld',
-        'color': (219, 229, 241),
+        'color_255': (219, 229, 241),
         'lower_limit': -4,
         'upper_limit': 7,
     },{
         'regime': 'Nat',
-        'color': (149, 179, 215),
+        'color_255': (149, 179, 215),
         'lower_limit': 7,
         'upper_limit': 10,
     },{
         'regime': 'Zeer nat',
-        'color': ( 53,  95, 145),
+        'color_255': ( 53,  95, 145),
         'lower_limit': 10,
         'upper_limit': None,
     }]
@@ -65,9 +67,12 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
         if regime['upper_limit']:
             filter += '[value] <= ' + str(regime['upper_limit'])
         regime['mapnik_filter'] = filter    
-        
-        
 
+    # Generate rgba colors
+    for regime in REGIMES:
+        regime['color_rgba'] = tuple(
+            [component/255. for component in regime['color_255']] + [1]
+        )
 
     def _mapnik_style(self):
         """
@@ -95,7 +100,7 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
 
         mapnik_style = mapnik.Style()
         mapnik_style.rules.extend([
-            mapnik_rule(regime['color'],regime['mapnik_filter'])
+            mapnik_rule(regime['color_255'],regime['mapnik_filter'])
             for regime in self.REGIMES
         ])
         return mapnik_style
@@ -202,6 +207,8 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
             "lizard_waterregime.workspace_item_bar_image",
             kwargs={'workspace_item_id': self.workspace_item.id},
             )
+        logger.debug(bar_img_url)
+
 
         return super(AdapterWaterRegime, self).html_default(
             snippet_group=snippet_group,
@@ -235,6 +242,28 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
             'identifier': identifier,
             }
 
+    def colorfunc_rgba(self,value):
+        """Return rgba_color corresponding to value."""
+        for regime in self.REGIMES:
+            if (
+                value > regime['lower_limit'] or
+                regime['lower_limit'] == None
+               ) and (
+                value <= regime['upper_limit'] or
+                regime['upper_limit'] == None
+               ):
+                return regime['color_rgba']
+
+        return (0,1,0,0)
+
+    def get_fake_data(self,identifier_list, start_date, end_date):
+        """Make up some testdata."""
+        from numpy import sin
+        from numpy import arange
+        dates = [datetime(2011,3,x) for x in range(1,30)]
+        values = [float(y) for y in 10*sin(arange(1,30)/4.)+5]
+        return dates,values
+
     def graph_image(self, identifier_list,
               start_date, end_date,
               width=None, height=None,
@@ -252,74 +281,54 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
         graph = adapter.Graph(start_date, end_date, width, height)
         graph.add_today()
 
-        # Find database object that contains the timeseries data.
-        """From fewsunblobbed:
-        timeserie = fews_timeserie(
-            self.filterkey,
-            identifier['locationkey'],
-            self.parameterkey)
-        timeseriedata = timeserie.timeseriedata.filter(
-            tsd_time__gte=start_date,
-            tsd_time__lte=end_date)
-         """
-
         # Plot testdata.
-        from numpy import sin, cos
-        from numpy import arange
-
-        dates = [datetime(2011,3,x) for x in range(1,20)]
-
-        values1 = [float(y) for y in sin(arange(1,20)/4.)]
-        values2 = [float(y) for y in cos(arange(1,20)/4.)]
-        values3 = [a-b for a,b in zip(values1,values2)]
-
-        graph.axes.plot(dates, values1)
-        graph.axes.plot(dates, values2)
-        graph.axes.plot(dates, values3)
+        dates, values = self.get_fake_data(
+            identifier_list, start_date, end_date
+        )
+        graph.axes.plot(dates, values)
+        
+        margin = 0.1
+        lowest_value = min(values)
+        highest_value = max(values)
+        span = highest_value - lowest_value
+        
+        graph.axes.set_ylim(
+            lowest_value - margin * span,
+            highest_value + margin * span
+        )
 
         return graph.http_png()
 
-    def bar_image(self, identifier_list, start_date, end_date,              
+    def bar_image(self, identifier_list, start_date, end_date,
         width=None, height=None, layout_extra=None):
         """Return a colored bar representing the regime against the time."""
-
+        
         if width is None:
             width = 380.0
         if height is None:
             height = 170.0
 
-        # Data TODO get with real data...
-        from numpy.random import rand
-        from numpy import arange
-        dates = [datetime(2011,3,x) for x in range(1,30)]
-        values = [int(round(y)) for y in 20*rand(29)-4]
-
+        dates, values = self.get_fake_data(
+            identifier_list, start_date, end_date
+        )
 
         graph = adapter.Graph(start_date, end_date, width, height)
         graph.add_today()
 
         # Make a nice broken_barh:
-        """
-        Loop this:
-        ax.broken_barh([ (date, ), (150, 10) ] , (10, 9), facecolor=(0,0,0))
+        colors = [self.colorfunc_rgba(value) for value in values]
 
-        xranges = [(date.replace(hour=1),
-            date.replace(hour=23)) for date in dates]
-        facecolors=
-        yrange = ()   
-        c
-        
-        #Value to color function: Just loop the regimes every time? Seems slow to me.
-        [list of ranges around date.]
-        list of colors
-                
-        graph.axes.broken_barh([ (10, 50), (100, 20),  (130, 10)] , (20, 9),
-                        facecolors=('red', 'yellow', 'green'))
+        xranges = [(
+            date2num(date.replace(hour=2)),
+            20./24.
+        ) for date in dates]
+        yrange = (0.1,0.8)
+
         graph.axes.set_ylim(0,10)
         graph.axes.set_yticks([5])
         graph.axes.set_yticklabels(['Regime'])
-        """
 
+        graph.axes.broken_barh(xranges,yrange,facecolors=colors)
         return graph.http_png()        
 
     def symbol_url(self, identifier=None, start_date=None, end_date=None,
@@ -347,12 +356,10 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
         legend_result = []
 
         for regime in self.REGIMES:
-            color = [component/255. for component in regime['color']]
-            color.append(1)
             img_url = self.symbol_url(
                 icon_style = {
                     'icon': 'empty.png',
-                    'color': color,
+                    'color': regime['color_rgba'],
                 }
             )
             description = regime['regime']
@@ -362,4 +369,18 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
             })
        
         return legend_result
+
+    def values(self, identifier_list, start_date, end_date):
+        """ Return values in list of dictionaries (datetime, value, unit)
+        """
+        dates,values = self.get_fake_data(
+            identifier_list, start_date, end_date
+        )
+        return [{
+                'datetime':date,
+                'value':value,
+                'unit':None
+            } for date,value in zip(dates,values) ]
+        
+        
 
