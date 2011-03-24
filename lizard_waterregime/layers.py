@@ -330,8 +330,13 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
         graph.axes.set_ylabel('Regime')
 
         graph.axes.broken_barh(xranges,yrange,facecolors=colors)
-        graph.axes.legend(loc=3)
-        return graph.http_png()        
+        # Legend building
+        #from matplotlib.patches import Rectangle
+        # artists = [Rectangle((0, 0), 1, 1, fc=regime['color_rgba']) for regime in Regimes]
+        #p = Rectangle((0, 0), 1, 1, fc="r")
+        #graph.axes.legend([p], ["Red\nRectangle"],
+        #   bbox_to_anchor=(-0.3, 0), loc=2, borderaxespad=0.)
+        return graph.http_png()
 
     def symbol_url(self, identifier=None, start_date=None, end_date=None,
                    icon_style=None):

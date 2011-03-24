@@ -8,3 +8,5 @@ Changelog of lizard-waterregime
 - Initial library skeleton created by nensskel
 
 - Implemented AdapterWaterregime with legend, hover and popup
+
+- Models extended for timeseries functionality
