@@ -26,18 +26,13 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
 
     Uses default database table "water_regime_shape" as geo database.
     """
-
+    # To be moved to table lizard_waterregime_regimes
     REGIMES = [{
-    # zeer droog komt niet voor in grenswaardentabel
     # nu gebaseerd op gewogen neerslagoverschot (p-e?)
     # alleen geldig binnen groeiseizoen, zie grenswaardentabel
-        'regime': 'Zeer droog',
-        'color_255': (226, 108,  10),
-        'lower_limit': None,
-        'upper_limit': -400,
-    },{
         'regime': 'Droog',
-        'color_255': (249, 191, 143),
+#       'color_255': (249, 191, 143),
+        'color_255': (225,  89,  47),
         'lower_limit': None,
         'upper_limit': -4,
     },{
@@ -170,8 +165,8 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
             afdeling = feature.properties['afdeling']
             gid = feature.properties['gid']
             popup_string = (
-                'Peilgebied %s, waarde: %i' % (
-                    afdeling, feature.properties['value'])
+                'Gewogen P-E: %1.1f mm/dag (%s)' % (
+                    feature.properties['value'], afdeling[:2]+'-'+afdeling[2:])
             )
             identifier = {
                 'afdeling': afdeling,
@@ -207,8 +202,6 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
             "lizard_waterregime.workspace_item_bar_image",
             kwargs={'workspace_item_id': self.workspace_item.id},
             )
-        logger.debug(bar_img_url)
-
 
         return super(AdapterWaterRegime, self).html_default(
             snippet_group=snippet_group,
@@ -234,7 +227,7 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
         }
 
         return {
-            'name': 'Peilgebied: ' + afdeling,
+            'name': 'Peilgebied: ' + afdeling[:2]+'-'+afdeling[2:],
             'shortname': afdeling,
             'object': None, # what object? --  TODO?
             'workspace_item': self.workspace_item,
@@ -285,17 +278,25 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
         dates, values = self.get_fake_data(
             identifier_list, start_date, end_date
         )
-        graph.axes.plot(dates, values)
+        valuesP = [value * 1.2 for value in values]
+        valuesE = [value * 0.2 for value in values]
+        graph.axes.plot(dates, values,'darkgreen', label='P - E', linewidth=2)
+        graph.axes.plot(dates, valuesP,color='gray', label='P')
+        graph.axes.plot(dates, valuesE,color='gray', label='E', linestyle='--')
         
         margin = 0.1
-        lowest_value = min(values)
-        highest_value = max(values)
+        allvalues = values + valuesP + valuesE
+        lowest_value = min(allvalues)
+        highest_value = max(allvalues)
         span = highest_value - lowest_value
         
         graph.axes.set_ylim(
             lowest_value - margin * span,
             highest_value + margin * span
         )
+        
+        graph.axes.set_ylabel('Neerslagoverschot (mm/dag)')
+        graph.axes.legend(loc=3)
 
         return graph.http_png()
 
@@ -324,11 +325,12 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
         ) for date in dates]
         yrange = (0.1,0.8)
 
-        graph.axes.set_ylim(0,10)
-        graph.axes.set_yticks([5])
-        graph.axes.set_yticklabels(['Regime'])
+        graph.axes.grid()
+        graph.axes.set_yticks([])
+        graph.axes.set_ylabel('Regime')
 
         graph.axes.broken_barh(xranges,yrange,facecolors=colors)
+        graph.axes.legend(loc=3)
         return graph.http_png()        
 
     def symbol_url(self, identifier=None, start_date=None, end_date=None,
