@@ -143,3 +143,40 @@ class FewsTimeSeries(models.Model):
     class Meta:
         unique_together = (("moduleinstanceid", "timestep",
             "fid", "lid", "pid"),)
+            
+class Regime(models.Model):
+    name = models.CharField(max_length=16)
+    color255 = models.CommaSeparatedIntegerField(max_length=11)
+    order = models.IntegerField()
+    
+    def __unicode__(self):
+        return self.name
+    
+    class Meta:
+        ordering = ['order']
+    
+
+class Season(models.Model):
+    name = models.CharField(max_length=32)
+    month_from = models.IntegerField()
+    day_from = models.IntegerField()
+    month_to = models.IntegerField()
+    day_to = models.IntegerField()
+    
+    def __unicode__(self):
+        return self.name
+
+    class Meta:
+        ordering = ['month_from','day_from']
+
+class Range(models.Model):
+    regime = models.ForeignKey(Regime)
+    season = models.ForeignKey(Season)
+    # limits refer to the 'neerslagoverschot'
+    lower_limit = models.DecimalField(
+        max_digits = 4, decimal_places = 1, null = True, blank = True
+    )
+    upper_limit = models.DecimalField(
+        max_digits = 4, decimal_places = 1, null = True, blank = True
+    )
+
