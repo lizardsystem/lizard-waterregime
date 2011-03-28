@@ -17,6 +17,7 @@ from lizard_map.workspace import WorkspaceItemAdapter
 from lizard_map.symbol_manager import SymbolManager
 
 from lizard_waterregime.models import WaterRegimeShape
+from lizard_waterregime.models import Regime
 
 logger = logging.getLogger('nens.waterregimeadapter')
 
@@ -64,10 +65,23 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
             filter += '[value] <= ' + str(regime['upper_limit'])
         regime['mapnik_filter'] = filter    
 
+        
+    # Regime Legend from table
+    legend_data = [{
+            'name':regime.name,
+            'color255':tuple(map(int,regime.color255.split(',')))
+        } for regime in Regime.objects.all()]
+
     # Generate rgba colors
     for regime in REGIMES:
         regime['color_rgba'] = tuple(
             [component/255. for component in regime['color_255']] + [1]
+        )
+
+    for data in legend_data:
+        logger.debug(data['color255'])
+        data['color_rgba'] = tuple(
+            [component/255. for component in data['color255']] + [1]
         )
 
     def _mapnik_style(self):
@@ -237,7 +251,11 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
             }
 
     def colorfunc_rgba(self,value):
-        """Return rgba_color corresponding to value."""
+        """Return rgba_color corresponding to value.
+        
+        Need to get it from table in the future, or get the values object at
+        once. 
+        """
         for regime in self.REGIMES:
             if (
                 value > regime['lower_limit'] or
@@ -286,19 +304,21 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
         valuesE = [value * 0.2 for value in values]
         graph.axes.plot(dates, values,'darkgreen', label='P - E', linewidth=2)
         graph.axes.plot(dates, valuesP,color='gray', label='P')
-        graph.axes.plot(dates, valuesE,color='gray', label='E', linestyle='--')
+        graph.axes.plot(
+            dates, valuesE,color='gray', label='E',linestyle='--')
         
-        margin = 0.1
+        # Create an extra margin outside the data
+        margin = 0.1 # Fraction of ylim padding outside data
         allvalues = values + valuesP + valuesE
         lowest_value = min(allvalues)
         highest_value = max(allvalues)
         span = highest_value - lowest_value
-        
         graph.axes.set_ylim(
             lowest_value - margin * span,
             highest_value + margin * span
         )
         
+        # Labeling and legend position
         graph.axes.set_ylabel('Neerslagoverschot (mm/dag)')
         graph.axes.legend(loc=3)
 
@@ -322,29 +342,28 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
 
         # Make a nice broken_barh:
         colors = [self.colorfunc_rgba(value) for value in values]
-
         xranges = [(
             date2num(date.replace(hour=2)),
             20./24.
         ) for date in dates]
         yrange = (0.1,0.8)
 
-        graph.axes.grid()
-        graph.axes.set_yticks([])
-        graph.axes.set_ylabel('Regime')
-
         graph.axes.broken_barh(xranges,yrange,facecolors=colors)
 
         # Legend building
-        #self.legend_on_bottom_height = 50
         logger.debug(graph.figure.get_size_inches())
         from matplotlib.patches import Rectangle
-        artists = [Rectangle((0, 0), 1, 1, fc=regime['color_rgba']) for regime in self.REGIMES]
-        labels = [regime['regime'] for regime in self.REGIMES]
-        graph.axes.legend(artists,labels,bbox_to_anchor=(0., -0.85, 1., 1.),
-        loc=3,ncol=4,mode="expand", borderaxespad=0.)
-        graph.figure.set_figheight = 1
+        artists = [Rectangle((0., 0.), .1, .1, fc=data['color_rgba'])
+            for data in self.legend_data]
+        labels = [data['name'] for data in self.legend_data]
+        # Make room for the legend, see the graph class from lizard-map
         graph.legend_on_bottom_height = 0.3
+        graph.axes.legend(artists,labels,bbox_to_anchor=(0., -0.7, 1., 1.),
+        loc=3,ncol=4,mode="expand", borderaxespad=0.)
+
+        graph.axes.grid()
+        graph.axes.set_yticks([])
+        graph.axes.set_ylabel('Regime')
         return graph.http_png()
 
     def symbol_url(self, identifier=None, start_date=None, end_date=None,
@@ -359,7 +378,7 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
                 'generated_icons'))
         if icon_style is None:
             icon_style = {
-                'icon': 'empty.png',
+                'icon': 'waterbalance.png',
                 'color': (0.5,1.0,0.5,0),
             }
         output_filename = sm.get_symbol_transformed(icon_style['icon'],
@@ -371,14 +390,14 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
 
         legend_result = []
 
-        for regime in self.REGIMES:
+        for data in self.legend_data:
             img_url = self.symbol_url(
                 icon_style = {
                     'icon': 'empty.png',
-                    'color': regime['color_rgba'],
+                    'color': data['color_rgba'],
                 }
             )
-            description = regime['regime']
+            description = data['name']
             legend_result.append({
                 'img_url': img_url, 
                 'description': description,
