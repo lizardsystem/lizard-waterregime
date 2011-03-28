@@ -20,24 +20,32 @@ class WaterRegimeShape(models.Model):
     objects = models.GeoManager()
 
 
-class LandType(models.Model):
-    """ Type of land. For example: corn, forest, water, etc.
+class LandCover(models.Model):
+    """ Land cover is the physical material or vegetation at the surface
+    of the earth. For example: corn, forest, grass, water, etc.
     """
     name = models.CharField(max_length=64, unique=True)
 
+    def get_cropfactor(self, date):
+        try:
+            obj = self.cropfactor_set.get(month=date.month, day=date.day)
+        except CropFactor.DoesNotExist:
+            obj = None
+        return obj
 
-class LandUse(models.Model):
-    """ Each geographical region can be subdivided into smaller areas
-    according to the type of land, for example: province Utrecht has
-    2% corn, 10% forest, etc. The class LandUse describes how much
-    a type of land contributes to a total region (in % area).
+
+class LandCoverData(models.Model):
+    """ Each geographical region can be characterized according to its
+    land cover. For example: the province of Utrecht has 2% corn,
+    10% forest, etc. The class LandCoverData describes how much
+    a type of cover contributes to a total region (in % area).
     """
     region = models.ForeignKey(WaterRegimeShape)
-    type = models.ForeignKey(LandType)
+    cover = models.ForeignKey(LandCover)
     fraction = models.FloatField()
 
     class Meta:
-        unique_together = (("region", "type"),)
+        unique_together = (("region", "cover"),)
 
 
 class CropFactor(models.Model):
@@ -45,9 +53,9 @@ class CropFactor(models.Model):
     certain vegetation. Since vegetation is a seasonal feature,
     crop factors generally do vary over the days of a year.
     """
-    crop = models.ForeignKey(LandType)
-    month = models.PositiveSmallIntegerField()
-    day = models.PositiveSmallIntegerField()
+    crop = models.ForeignKey(LandCover)
+    month = models.SmallIntegerField()
+    day = models.SmallIntegerField()
     factor = models.FloatField()
 
     class Meta:
