@@ -4,6 +4,7 @@ import os
 from datetime import datetime
 from datetime import timedelta
 from matplotlib.dates import date2num
+from matplotlib.dates import num2date
 
 from django.core.urlresolvers import reverse
 from django.conf import settings
@@ -253,8 +254,11 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
         """Make up some testdata."""
         from numpy import sin
         from numpy import arange
-        dates = [datetime(2011,3,x) for x in range(1,30)]
-        values = [float(y) for y in 10*sin(arange(1,30)/4.)+5]
+        startdate = datetime(2011,1,1)
+        enddate = datetime(2013,12,31)
+        numbers = arange(int(date2num(startdate)),int(date2num(enddate)))
+        dates = [num2date(num) for num in numbers]
+        values = list(10. * sin(numbers / 4. ) + 5.)
         return dates,values
 
     def graph_image(self, identifier_list,
@@ -330,12 +334,17 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
         graph.axes.set_ylabel('Regime')
 
         graph.axes.broken_barh(xranges,yrange,facecolors=colors)
+
         # Legend building
-        #from matplotlib.patches import Rectangle
-        # artists = [Rectangle((0, 0), 1, 1, fc=regime['color_rgba']) for regime in Regimes]
-        #p = Rectangle((0, 0), 1, 1, fc="r")
-        #graph.axes.legend([p], ["Red\nRectangle"],
-        #   bbox_to_anchor=(-0.3, 0), loc=2, borderaxespad=0.)
+        #self.legend_on_bottom_height = 50
+        logger.debug(graph.figure.get_size_inches())
+        from matplotlib.patches import Rectangle
+        artists = [Rectangle((0, 0), 1, 1, fc=regime['color_rgba']) for regime in self.REGIMES]
+        labels = [regime['regime'] for regime in self.REGIMES]
+        graph.axes.legend(artists,labels,bbox_to_anchor=(0., -0.85, 1., 1.),
+        loc=3,ncol=4,mode="expand", borderaxespad=0.)
+        graph.figure.set_figheight = 1
+        graph.legend_on_bottom_height = 0.3
         return graph.http_png()
 
     def symbol_url(self, identifier=None, start_date=None, end_date=None,
