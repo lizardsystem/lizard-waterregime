@@ -7,6 +7,7 @@ from matplotlib.dates import date2num
 from matplotlib.dates import num2date
 
 from django.core.urlresolvers import reverse
+from django.core.cache import cache
 from django.conf import settings
 
 from lizard_map import coordinates
@@ -18,8 +19,15 @@ from lizard_map.symbol_manager import SymbolManager
 
 from lizard_waterregime.models import WaterRegimeShape
 from lizard_waterregime.models import Regime
+from lizard_waterregime.models import Season
 
 logger = logging.getLogger('nens.waterregimeadapter')
+
+class SeasonError(Exception):
+    def __init__(self, value):
+        self.value = value
+    def __str__(self):
+        return repr(self.value)
 
 class AdapterWaterRegime(WorkspaceItemAdapter):
     """Adapter for module lizard_waterregime.
@@ -28,78 +36,75 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
 
     Uses default database table "water_regime_shape" as geo database.
     """
-    # To be moved to table lizard_waterregime_regimes
-    REGIMES = [{
-    # nu gebaseerd op gewogen neerslagoverschot (p-e?)
-    # alleen geldig binnen groeiseizoen, zie grenswaardentabel
-        'regime': 'Droog',
-#       'color_255': (249, 191, 143),
-        'color_255': (225,  89,  47),
-        'lower_limit': None,
-        'upper_limit': -4,
-    },{
-        'regime': 'Gemiddeld',
-        'color_255': (219, 229, 241),
-        'lower_limit': -4,
-        'upper_limit': 7,
-    },{
-        'regime': 'Nat',
-        'color_255': (149, 179, 215),
-        'lower_limit': 7,
-        'upper_limit': 10,
-    },{
-        'regime': 'Zeer nat',
-        'color_255': ( 53,  95, 145),
-        'lower_limit': 10,
-        'upper_limit': None,
-    }]
-    
-    # Generate mapnik filters
-    for regime in REGIMES:
-        filter =''
-        if regime['lower_limit']:
-            filter += '[value] > ' + str(regime['lower_limit'])
-        if regime['lower_limit'] and regime['upper_limit']:
-            filter += ' and '
-        if regime['upper_limit']:
-            filter += '[value] <= ' + str(regime['upper_limit'])
-        regime['mapnik_filter'] = filter    
 
+    def _season(self,regimedatetime=None):
+        """Return a Season object.
         
-    # Regime Legend from table
-    legend_data = [{
-            'name':regime.name,
-            'color255':tuple(map(int,regime.color255.split(',')))
-        } for regime in Regime.objects.all()]
+        This method could be overriden in another adapter to """
 
-    # Generate rgba colors
-    for regime in REGIMES:
-        regime['color_rgba'] = tuple(
-            [component/255. for component in regime['color_255']] + [1]
+        regimedatetime = datetime(2011,6,21)
+
+        if not regimedatetime:
+            regimedatetime = datetime.now()
+
+        # Caching
+        cached_result = cache.get('season'+str(regimedatetime.date()))
+        if cached_result:
+            return cached_result
+
+        # Hopefully nobody entered overlapping seasons in the database
+        seasons = Season.objects.filter(
+            month_from__lte=regimedatetime.month,
+            month_to__gte=regimedatetime.month,
+            day_from__lte=regimedatetime.day,
+            day_to__gte=regimedatetime.day,
         )
+        if len(seasons) > 1:
+            raise SeasonError('Overlapping seasons in the database')
+        
+        season = seasons[0]
+        
+        cache.set('season'+str(regimedatetime.date()), season)
+        return season
 
-    for data in legend_data:
-        logger.debug(data['color255'])
-        data['color_rgba'] = tuple(
-            [component/255. for component in data['color255']] + [1]
-        )
+    def _mapnik_style(self, season):
+        """ Return a mapnik_style, accounting for season """
+        
+        def _filters(season):
+        
+            """Generate mapnikfilters and colors for the ranges in this
+            season."""
+            colors = []
+            filters = []
 
-    def _mapnik_style(self):
-        """
-        Temp function to return a default mapnik style
-        """
+            regimeranges = season.range_set.all()
+            for r in regimeranges:
+                # only append filter and color if at least one range is set
+                if r.lower_limit or r.upper_limit:
+                    mapnik_filter = ''
+                    if r.lower_limit:
+                        mapnik_filter += '[value] > ' + str(r.lower_limit)
+                    if r.lower_limit and r.upper_limit:
+                        mapnik_filter += ' and '
+                    if r.upper_limit:
+                        mapnik_filter += '[value] <= ' + str(r.upper_limit)
+                    filters.append(mapnik_filter)
+                    colors.append(r.regime.color_255())
 
-        def mapnik_rule(color, mapnik_filter=None):
-            """
-            Makes mapnik rule for looks. For lines and polygons.
+            result = zip(colors,filters)
+            logger.debug(result)
+            return result
 
-            From lizard_map.models.
-            """
+            
+        def _mapnik_rule(color, mapnik_filter):
+            """ Return a mapnik_rule
+            
+            Here also the line thickness and fill opacity can be set."""
             rule = mapnik.Rule()
-            if mapnik_filter is not None:
-                rule.filter = mapnik.Filter(mapnik_filter)
-            mapnik_color = mapnik.Color(*color)
 
+            rule.filter = mapnik.Filter(mapnik_filter)
+
+            mapnik_color = mapnik.Color(*color)
             symb_line = mapnik.LineSymbolizer(mapnik_color, 2)
             rule.symbols.append(symb_line)
 
@@ -107,12 +112,12 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
             symb_poly.fill_opacity = .8
             rule.symbols.append(symb_poly)
             return rule
+        
 
         mapnik_style = mapnik.Style()
-        mapnik_style.rules.extend([
-            mapnik_rule(regime['color_255'],regime['mapnik_filter'])
-            for regime in self.REGIMES
-        ])
+        mapnik_style.rules.extend(
+            [_mapnik_rule(*args) for args in _filters(season)]
+        )
         return mapnik_style
 
     def layer(self, layer_ids=None, request=None):
@@ -123,7 +128,7 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
         styles = {}
 
         db_settings = settings.DATABASES['default']
-        table_view = """(
+        shape_view = str("""(
             select
                 gid,
                 afdeling,
@@ -133,20 +138,23 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
                 gid * 5 - 12 as value
             from
                 lizard_waterregime_waterregimeshape) result_view
-        """
+        """)
         layer = mapnik.Layer('Geometry from PostGIS')
-        layer.srs = RD  #GOOGLE
+        # RD = rijksdriehoek. Somehow 'Google' is also mentioned originally?
+        layer.srs = RD
         layer.datasource = mapnik.PostGIS(
-            host=db_settings['HOST'],
-            user=db_settings['USER'],
-            password=db_settings['PASSWORD'],
-            dbname=db_settings['NAME'],
-            table=str(table_view))
-        layers.append(layer)
+            host = db_settings['HOST'],
+            user = db_settings['USER'],
+            password = db_settings['PASSWORD'],
+            dbname = db_settings['NAME'],
+            table = shape_view
+        )
 
         style_name = 'waterregime_style'
+
         layer.styles.append(style_name)
-        mapnik_style = self._mapnik_style()
+        layers.append(layer)
+        mapnik_style = self._mapnik_style(self._season())
         styles[style_name] = mapnik_style
 
         return layers, styles
@@ -250,44 +258,44 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
             'identifier': identifier,
             }
 
-    def colorfunc_rgba(self,value):
-        """Return rgba_color corresponding to value.
+    def _colorfunc(self,value):
+        """Return rgba_color corresponding to value."""
         
-        Need to get it from table in the future, or get the values object at
-        once. 
-        """
-        for regime in self.REGIMES:
-            if (
-                value > regime['lower_limit'] or
-                regime['lower_limit'] == None
-               ) and (
-                value <= regime['upper_limit'] or
-                regime['upper_limit'] == None
-               ):
-                return regime['color_rgba']
+        # We're going to cache the regimeranges
+        regimeranges = cache.get('regimeranges')
+        if not regimeranges:
+            regimeranges = self._season().range_set.all()
+            cache.set('regimeranges',regimeranges)
+
+        for r in regimeranges:
+            # only valid range if at least one limit is set
+            if r.upper_limit or r.lower_limit:
+                
+                if (
+                    r.lower_limit == None or
+                    value >= float(r.lower_limit)
+                   ) and (
+                    r.upper_limit == None or
+                    value < float(r.upper_limit)
+                   ):
+                    color = r.regime.color_rgba() 
+                    return color
 
         return (0,1,0,0)
 
-    def get_fake_data(self,identifier_list, start_date, end_date):
+    def _get_fake_data(self,identifier_list, start_date, end_date):
         """Make up some testdata."""
         from numpy import sin
         from numpy import arange
-        startdate = datetime(2011,1,1)
-        enddate = datetime(2013,12,31)
-        numbers = arange(int(date2num(startdate)),int(date2num(enddate)))
+        numbers = arange(int(date2num(start_date)),int(date2num(end_date)))
         dates = [num2date(num) for num in numbers]
         values = list(10. * sin(numbers / 4. ) + 5.)
         return dates,values
 
-    def graph_image(self, identifier_list,
-              start_date, end_date,
-              width=None, height=None,
-              layout_extra=None):
-        """
-        visualizes scores or measures in a graph
-
-        each row is an area
-        """
+    def graph_image(self, identifier_list,start_date, end_date,
+                    width=None, height=None, layout_extra=None):
+        """Visualize scores or measures in a graph each row is an area."""
+        
         if width is None:
             width = 380.0
         if height is None:
@@ -297,7 +305,7 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
         graph.add_today()
 
         # Plot testdata.
-        dates, values = self.get_fake_data(
+        dates, values = self._get_fake_data(
             identifier_list, start_date, end_date
         )
         valuesP = [value * 1.2 for value in values]
@@ -333,7 +341,7 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
         if height is None:
             height = 170.0
 
-        dates, values = self.get_fake_data(
+        dates, values = self._get_fake_data(
             identifier_list, start_date, end_date
         )
 
@@ -341,7 +349,7 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
         graph.add_today()
 
         # Make a nice broken_barh:
-        colors = [self.colorfunc_rgba(value) for value in values]
+        colors = [self._colorfunc(v) for v in values]
         xranges = [(
             date2num(date.replace(hour=2)),
             20./24.
@@ -351,11 +359,12 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
         graph.axes.broken_barh(xranges,yrange,facecolors=colors)
 
         # Legend building
-        logger.debug(graph.figure.get_size_inches())
         from matplotlib.patches import Rectangle
-        artists = [Rectangle((0., 0.), .1, .1, fc=data['color_rgba'])
-            for data in self.legend_data]
-        labels = [data['name'] for data in self.legend_data]
+        artists = []
+        labels = []
+        for r in Regime.objects.all():
+            artists.append(Rectangle((0., 0.), .1, .1, fc=r.color_rgba()))
+            labels.append(r.name)
         # Make room for the legend, see the graph class from lizard-map
         graph.legend_on_bottom_height = 0.3
         graph.axes.legend(artists,labels,bbox_to_anchor=(0., -0.7, 1., 1.),
@@ -390,14 +399,14 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
 
         legend_result = []
 
-        for data in self.legend_data:
+        for r in Regime.objects.all():
             img_url = self.symbol_url(
                 icon_style = {
                     'icon': 'empty.png',
-                    'color': data['color_rgba'],
+                    'color': r.color_rgba(),
                 }
             )
-            description = data['name']
+            description = r.name
             legend_result.append({
                 'img_url': img_url, 
                 'description': description,
@@ -417,5 +426,3 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
                 'unit':None
             } for date,value in zip(dates,values) ]
         
-        
-
