@@ -179,6 +179,14 @@ class Regime(models.Model):
     name = models.CharField(max_length=16)
     color255 = models.CommaSeparatedIntegerField(max_length=11)
     order = models.IntegerField()
+
+    def color_255(self):
+        """Return an rgb color tuple in the (255,255,255) format."""
+        return tuple(map(int,self.color255.split(',')))
+
+    def color_rgba(self):
+        """Return an rgba color tuple in the (1,1,1,1) format."""
+        return tuple([c/255. for c in self.color_255()] + [1])
     
     def __unicode__(self):
         return self.name
