@@ -18,6 +18,17 @@ class WaterRegimeShape(models.Model):
     area_m2 = models.DecimalField(max_digits=20, decimal_places=10)
     the_geom = models.MultiPolygonField(srid= -1)
     objects = models.GeoManager()
+    
+    def get_cropfactor(self, date):
+        """ Returns a weighted crop factor: each land cover's crop factor is
+        weighted according to the fraction it contributes to the total area.
+        """
+        ## This is nicely OO, but will hit the database for each iteration.
+        ## Further optimization might be necessary...
+        cropfactor = 0
+        for land in self.landcoverdata_set.all():
+            cropfactor += land.fraction * land.cover.get_cropfactor(date)
+        return cropfactor
 
 
 class LandCover(models.Model):
@@ -27,11 +38,7 @@ class LandCover(models.Model):
     name = models.CharField(max_length=64, unique=True)
 
     def get_cropfactor(self, date):
-        try:
-            obj = self.cropfactor_set.get(month=date.month, day=date.day)
-        except CropFactor.DoesNotExist:
-            obj = None
-        return obj
+        return self.cropfactor_set.get(month=date.month, day=date.day).factor
 
 
 class LandCoverData(models.Model):
@@ -52,6 +59,10 @@ class CropFactor(models.Model):
     """ Factor to correct the evaporation of a reference area for a
     certain vegetation. Since vegetation is a seasonal feature,
     crop factors generally do vary over the days of a year.
+    
+    For our purpose, a Penman factor can be considered as a crop
+    factor for open water. Since the distinction is irrelevant,
+    Penman factors are modeled accordingly.
     """
     crop = models.ForeignKey(LandCover)
     month = models.SmallIntegerField()
