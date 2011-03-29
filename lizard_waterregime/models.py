@@ -154,7 +154,27 @@ class FewsTimeSeries(models.Model):
     class Meta:
         unique_together = (("moduleinstanceid", "timestep",
             "fid", "lid", "pid"),)
-            
+
+
+class Constant(models.Model):
+    """ This class represents some "constants" used in the various formula's.
+    As per requirement, they have to be modifiable by a user/administrator.
+    """
+    name = models.CharField(max_length=64, unique=True)
+    value = models.FloatField()
+    description = models.CharField(max_length=128, unique=True)
+    
+    @classmethod
+    def get(cls, name):
+        """ Returns the value of the constant or None if no constant
+        is known by this name.
+        """
+        try:
+            return cls.objects.get(name=name).value
+        except Constant.DoesNotExist:
+            return None
+
+
 class Regime(models.Model):
     name = models.CharField(max_length=16)
     color255 = models.CommaSeparatedIntegerField(max_length=11)
