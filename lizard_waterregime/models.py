@@ -18,15 +18,15 @@ class WaterRegimeShape(models.Model):
     area_m2 = models.DecimalField(max_digits=20, decimal_places=10)
     the_geom = models.MultiPolygonField(srid= -1)
     objects = models.GeoManager()
-    
+
     def get_cropfactor(self, date):
         """ Returns a weighted crop factor: each land cover's crop factor is
         weighted according to the fraction it contributes to the total area.
         """
-        ## This is nicely OO, but will hit the database for each iteration.
-        ## Further optimization might be necessary...
+        ## This is nicely OO, but will hit the database once for each
+        ## iteration. Without select_related() even twice!
         cropfactor = 0
-        for land in self.landcoverdata_set.all():
+        for land in self.landcoverdata_set.select_related('cover'):
             cropfactor += land.fraction * land.cover.get_cropfactor(date)
         return cropfactor
 
@@ -38,7 +38,8 @@ class LandCover(models.Model):
     name = models.CharField(max_length=64, unique=True)
 
     def get_cropfactor(self, date):
-        return self.cropfactor_set.get(month=date.month, day=date.day).factor
+        return self.cropfactor_set.only('factor').get(
+            month=date.month, day=date.day).factor
 
 
 class LandCoverData(models.Model):
@@ -59,7 +60,7 @@ class CropFactor(models.Model):
     """ Factor to correct the evaporation of a reference area for a
     certain vegetation. Since vegetation is a seasonal feature,
     crop factors generally do vary over the days of a year.
-    
+
     For our purpose, a Penman factor can be considered as a crop
     factor for open water. Since the distinction is irrelevant,
     Penman factors are modeled accordingly.
@@ -136,9 +137,9 @@ class FewsTimeSeries(models.Model):
     def events(self, start=datetime.min, end=datetime.max):
         """
         """
-        fpk = Filter.objects.get(id=self.fid).pk
-        lpk = Location.objects.get(id=self.lid).pk
-        ppk = Parameter.objects.get(id=self.pid).pk
+        fpk = Filter.objects.only('fews_id').get(fews_id=self.fid).pk
+        lpk = Location.objects.only('id').get(id=self.lid).pk
+        ppk = Parameter.objects.only('id').get(id=self.pid).pk
 
         timeseries = Timeserie.objects.get(
             moduleinstanceid=self.moduleinstanceid,
@@ -147,8 +148,8 @@ class FewsTimeSeries(models.Model):
             locationkey=lpk,
             parameterkey=ppk)
 
-        for event in timeseries.timeseriesdata.filter(
-            tsd_time__range=(start, end)).order_by('tsd_time'):
+        for event in timeseries.timeseriedata.only('tsd_time', 'tsd_value').\
+            filter(tsd_time__range=(start, end)).order_by('tsd_time'):
             yield event.tsd_time, event.tsd_value
 
     class Meta:
@@ -157,17 +158,17 @@ class FewsTimeSeries(models.Model):
 
 
 class Constant(models.Model):
-    """ This class represents some "constants" used in the various formula's.
+    """ This class represents some "constants" used in the various formulas.
     As per requirement, they have to be modifiable by a user/administrator.
     """
     name = models.CharField(max_length=64, unique=True)
     value = models.FloatField()
     description = models.CharField(max_length=128, unique=True)
-    
+
     @classmethod
     def get(cls, name):
         """ Returns the value of the constant or None if no constant
-        is known by this name.
+        by this name is known.
         """
         try:
             return cls.objects.get(name=name).value
