@@ -33,39 +33,25 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
     """Adapter for module lizard_waterregime.
 
     Registered as adapter_waterregime.
-
     Uses default database table "water_regime_shape" as geo database.
-    """
+    Set the regimedatetime attribute for"""
 
-    def _season(self,regimedatetime=None):
-        """Return a Season object.
-        
-        This method could be overriden in another adapter to """
+    regimedatetime = datetime.now()
+    regimedatetime = datetime.now()+timedelta(days=10)
 
-        regimedatetime = datetime(2011,6,21)
+    def _season(self):
+        """Return a Season object."""
 
-        if not regimedatetime:
-            regimedatetime = datetime.now()
-
-        # Caching
-        cached_result = cache.get('season'+str(regimedatetime.date()))
-        if cached_result:
-            return cached_result
-
-        # Hopefully nobody entered overlapping seasons in the database
         seasons = Season.objects.filter(
-            month_from__lte=regimedatetime.month,
-            month_to__gte=regimedatetime.month,
-            day_from__lte=regimedatetime.day,
-            day_to__gte=regimedatetime.day,
+            month_from__lte=self.regimedatetime.month,
+            month_to__gte=self.regimedatetime.month,
+            day_from__lte=self.regimedatetime.day,
+            day_to__gte=self.regimedatetime.day,
         )
         if len(seasons) > 1:
             raise SeasonError('Overlapping seasons in the database')
-        
-        season = seasons[0]
-        
-        cache.set('season'+str(regimedatetime.date()), season)
-        return season
+        else:        
+            return seasons[0]
 
     def _mapnik_style(self, season):
         """ Return a mapnik_style, accounting for season """
@@ -91,9 +77,7 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
                     filters.append(mapnik_filter)
                     colors.append(r.regime.color_255())
 
-            result = zip(colors,filters)
-            logger.debug(result)
-            return result
+            return zip(colors,filters)
 
             
         def _mapnik_rule(color, mapnik_filter):
@@ -252,7 +236,7 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
         return {
             'name': 'Peilgebied: ' + afdeling[:2]+'-'+afdeling[2:],
             'shortname': afdeling,
-            'object': None, # what object? --  TODO?
+            'object': None,
             'workspace_item': self.workspace_item,
             'google_coords': (google_x, google_y),
             'identifier': identifier,
