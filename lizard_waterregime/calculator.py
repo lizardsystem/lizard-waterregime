@@ -1,26 +1,46 @@
 from lizard_waterregime.models import TimeSeriesFactory
 from lizard_waterregime.models import WaterRegimeShape
+from lizard_waterregime.models import PrecipitationSurplus
 
 from datetime import datetime
 from datetime import timedelta
 
 from numpy import abs
 from numpy import arange
-from numpy import ones
-from numpy import convolve
 from numpy import array
+from numpy import convolve
+from numpy import ones
 from numpy import vstack
 
-class RegimeCalculator(object):
+def _first_of_hour(dt):
+    """Return the first moment of the hour for a datetime."""
+    return datetime(dt.year, dt.month, dt.day, dt.hour)
 
-    erouter = {
-            'P_HAZOF' : 'E_LELYSTAD',
-            'P_LAZOF' : 'E_LELYSTAD',
-            'P_HANOP' : 'E_MARKNESSE',
-            'P_LANOP' : 'E_MARKNESSE',
-            'P_TANOP' : 'E_MARKNESSE',
-    }
+# This *could* also be in the database. It relates timeseries
+timeseries_dict = {
+        'E_HAZOF' : 'E_LELYSTAD',
+        'E_LAZOF' : 'E_LELYSTAD',
+        'E_HANOP' : 'E_MARKNESSE',
+        'E_LANOP' : 'E_MARKNESSE',
+        'E_TANOP' : 'E_MARKNESSE',
+        'P_HAZOF' : 'P_HAZOF',
+        'P_LAZOF' : 'P_LAZOF',
+        'P_HANOP' : 'P_HANOP',
+        'P_LANOP' : 'P_LANOP',
+        'P_TANOP' : 'P_TANOP',
+}
+
+
+class RegimeCalculator(object):
+    """ Calculation methods for the waterregime djangoapp.
     
+    TODO: Many methods transform lists into arrays and / or return arrays.
+    Better to transform at one place instead of back and forth for each
+    method."""
+    
+
+    
+        
     @classmethod
     def weights(cls,r=1.5, tmax=7, stretch=1):
         """Return an array of weightfactors with length (tmax * stretch).
@@ -29,11 +49,21 @@ class RegimeCalculator(object):
         or P-E. The most recent value, with the highest weight, is last."""
         days = arange(-tmax + 1.,1)
         factors = 1 / abs(days - r)
-        #factors.resize((tmax,1))
-        #tmp = ones(tmax,stre
         stretched_factors = (factors.reshape(tmax,1) * ones((tmax,stretch))).ravel()
         normalized_factors = stretched_factors / sum(stretched_factors)
         return normalized_factors
+
+
+    @classmethod
+    def weighted_events(cls, events, weights):
+        """ Return array of weighted events."""
+        dates,values = array([list(events)]).transpose()
+
+        weighted_dates = dates[weights.size - 1:]
+
+        print weights.shape
+        weighted_values = convolve(values.reshape(-1,),weights,'valid')
+        return vstack((daily_dates,daily_values)).transpose()
 
         
     @classmethod
@@ -74,37 +104,77 @@ class RegimeCalculator(object):
 
         return vstack((daily_dates,daily_values)).transpose()
 
+    @classmethod
+    def subtract_event_values(cls, events_a, events_b):
+        """ Return events with dates from a and values a - b """
+        return [
+            (pair[0][0], pair[0][1] - pair[1][1])
+            for pair in zip(list(events_a),list(events_b))]
 
     @classmethod
-    def weighted_series(cls,timeseries, weights):
-        return None
-
+    def multiply_event_values(cls, events_a, events_b):
+        """ Return events with dates from a and values a - b """
+        return [
+            (pair[0][0], pair[0][1] * pair[1][1])
+            for pair in zip(list(events_a),list(events_b))]
 
     @classmethod
-    def test(cls):
-        t1 = datetime(2011,3,16)
-        t2 = datetime(2011,3,31)
-        tsd = {
-            'E_LELYSTAD' : TimeSeriesFactory.get('E_LELYSTAD'),
-            'E_MARKNESSE' : TimeSeriesFactory.get('E_MARKNESSE'),
-            'P_HAZOF' : TimeSeriesFactory.get('P_HAZOF'),
-            'P_LAZOF' : TimeSeriesFactory.get('P_LAZOF'),
-            'P_HANOP' : TimeSeriesFactory.get('P_HANOP'),
-            'P_LANOP' : TimeSeriesFactory.get('P_LANOP'),
-            'P_TANOP' : TimeSeriesFactory.get('P_TANOP'),
-        }
+    def multiply_event_values(cls, events, factor):
+        """ Return events with values multiplied by factor """
+        return [(e[0], e[1] * factor) for e in events]
 
-        for x in tsd['E_LELYSTAD'].events(t1,t2):
-            print x
-        
-        y=array(list(tsd['E_LELYSTAD'].events(t1,t2)))
-        print y.shape
-        print cls.stretch(y,2)
+    @classmethod
+    def refresh(cls,dt):
+        """ Check and if necessary insert precipitationsurplus values in
+        database for datetime """
+        try:
+            counts = PrecipitationSurplus.objects.get(
+                        date=_first_of_hour(dt)
+                     ).count()
+
+            return counts
+        except PrecipitationSurplus.DoesNotExist:
+            # nieuwe precipitationsurplusobjecten in database stoppen
+            WaterRegimeShape.objects.all()
+            t1 = dt
+            t2 = dt + timedelta(days=-7)
+
+            print(t1)
+            print(t2)
+            print(list(TimeSeriesFactory.get('E_MARKNESSE').events(t1,t2)))
+            
+            # get the events
+            events = {}
+            for s in set(timeseries_dict.itervalues()):
+                events[s] = TimeSeriesFactory.get(s).events(t1,t2)
+
+            # get the shapes
+            shapes = WaterRegimeShape.objects.all()
+
+            # tidying up:
+            p_events = {}
+            e_events = {}
+            c_events = {}
+            
+            for s in shapes:
+                p_events[s.afdeling] = events[timeseries_dict['P_' + s.afdeling]]
+                e_events[s.afdeling] = events[timeseries_dict['E_' + s.afdeling]]
+
+                c_events[s.afdeling] = [
+                    (d,s.get_cropfactor(d)) for d,v in e_events[s.afdeling]
+                ]
+
+                # todo here:
+                #   convert p_events to daily
+                #   multiply e_events by c_events values (use the multiply... method)
+                #   subtract p from e, use the subtract method
+                #   use weighting method
+                # save() the values in the database for each shape.
+            return 0
 
     @classmethod        
-    def test2(cls):
-        x = cls.weights(tmax=5,r=5.6,stretch=7)
-        print x
-        print sum(x)
-        print x.size
+    def test(cls):
+        print cls.refresh(datetime.now())
+        
+
 
