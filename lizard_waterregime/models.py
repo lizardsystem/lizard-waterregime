@@ -220,3 +220,8 @@ class Range(models.Model):
         max_digits = 4, decimal_places = 1, null = True, blank = True
     )
 
+class PrecipitationSurplus(models.Model):
+    waterregimeshape = models.ForeignKey(WaterRegimeShape)
+    date = models.DateTimeField()
+    value = models.FloatField()
+
