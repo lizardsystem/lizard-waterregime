@@ -4,6 +4,7 @@
 # Create your models here.
 
 from datetime import datetime
+from datetime import timedelta
 from django.contrib.gis.db import models
 from lizard_fewsunblobbed.models import Filter
 from lizard_fewsunblobbed.models import Location
@@ -90,14 +91,55 @@ class TimeSeriesFactory(models.Model):
         return eval(class_name).objects.get(name=series_name)
 
 
-class DefaultTimeSeries(models.Model):
+class TimeSeries(object):
+    """ Super class of all TimeSeries implementations. Not to be instantiated
+    directly: should be considered as an abstract base class.
+    """
+    def events(self, start=datetime.min, end=datetime.max, missing=None):
+        """ Returns all events between [start, end]. By default, any
+        missing values between the first and last event are replaced
+        by None. Magic values, e.g. -999.0, are not considered as
+        missing - only datetimes that are completely absent.
+        This might be better handled at the fews level?
+        
+        This method makes quite some assumptions about the data:
+        
+        1) Events are spaced at uniform time intervals.
+        2) Naive datetime objects (no timezone).
+        3) All datetimes are nicely rounded.
+        4) Events are in ascending order.
+        
+        For example:
+        
+        2011-04-01 09:00,  123.4
+        2011-04-01 11:00, -999.0
+        
+        becomes:
+        
+        2011-04-01 09:00,  123.4
+        2011-04-01 10:00,  None
+        2011-04-01 11:00, -999.0
+        
+        """
+        next = datetime.max
+        delta = timedelta(hours=self.hours)
+        for time, value in self.raw_events(start, end):
+            while next < time:
+                yield next, missing
+                next += delta
+            yield time, value
+            next = time + delta
+
+
+class DefaultTimeSeries(models.Model, TimeSeries):
     """ Represents a time series, i.e. a sequence of time series
     events (or data points) measured at successive times.
     Data is physically located in the default database.
     """
     name = models.CharField(max_length=64, unique=True)
+    hours = models.IntegerField() ## timedelta
 
-    def events(self, start=datetime.min, end=datetime.max):
+    def raw_events(self, start=datetime.min, end=datetime.max):
         """
         """
         for event in self.timeseriesevent_set.filter(
@@ -118,23 +160,24 @@ class TimeSeriesEvent(models.Model):
         ordering = ("datetime",)
 
 
-class FewsTimeSeries(models.Model):
+class FewsTimeSeries(models.Model, TimeSeries):
     """ Represents a time series, i.e. a sequence of time series
     events (or data points) measured at successive times.
     Data is physically located in the fews database.
     """
     name = models.CharField(max_length=64, unique=True)
-    ## By design, a fews time series is not uniquely defined by
-    ## fid, lid, and pid. The next 2 fields are required too?
+    hours = models.IntegerField() ## timedelta
+    
+    ## Fews timeseries are uniquely defined by the following 5
+    ## fields. We do rely on primary keys, because these may
+    ## vary across imports.
     moduleinstanceid = models.CharField(max_length=64)
     timestep = models.CharField(max_length=64)
-    ## Alternative keys are stored instead of the primary keys,
-    ## because the former are considered more stable.
     fid = models.CharField(max_length=64)
     lid = models.CharField(max_length=64)
     pid = models.CharField(max_length=64)
 
-    def events(self, start=datetime.min, end=datetime.max):
+    def raw_events(self, start=datetime.min, end=datetime.max):
         """
         """
         fpk = Filter.objects.only('fews_id').get(fews_id=self.fid).pk
