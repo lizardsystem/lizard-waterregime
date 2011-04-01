@@ -142,8 +142,9 @@ class DefaultTimeSeries(models.Model, TimeSeries):
     def raw_events(self, start=datetime.min, end=datetime.max):
         """
         """
-        for event in self.timeseriesevent_set.filter(
-            datetime__range=(start, end)):
+        for event in self.timeseriesevent_set.\
+            only('datetime', 'value').\
+            filter(datetime__range=(start, end)):
             yield event.datetime, event.value
 
 
