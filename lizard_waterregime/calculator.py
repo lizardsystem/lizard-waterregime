@@ -1,6 +1,7 @@
+from lizard_waterregime.models import Constant
+from lizard_waterregime.models import PrecipitationSurplus
 from lizard_waterregime.models import TimeSeriesFactory
 from lizard_waterregime.models import WaterRegimeShape
-from lizard_waterregime.models import PrecipitationSurplus
 
 from datetime import datetime
 from datetime import timedelta
@@ -113,68 +114,81 @@ class RegimeCalculator(object):
 
     @classmethod
     def multiply_event_values(cls, events_a, events_b):
-        """ Return events with dates from a and values a - b """
+        """ Return events with dates from a and values a * b """
         return [
             (pair[0][0], pair[0][1] * pair[1][1])
             for pair in zip(list(events_a),list(events_b))]
 
-    @classmethod
-    def multiply_event_values(cls, events, factor):
-        """ Return events with values multiplied by factor """
-        return [(e[0], e[1] * factor) for e in events]
+## Arjan, we hebben al een methode met deze naam?
+#    @classmethod
+#    def multiply_event_values(cls, events, factor):
+#        """ Return events with values multiplied by factor """
+#        return [(e[0], e[1] * factor) for e in events]
 
     @classmethod
     def refresh(cls,dt):
         """ Check and if necessary insert precipitationsurplus values in
         database for datetime """
+        
+        ## Arjan, try block werkt niet. Wat wil je hier doen?
+        
         try:
             counts = PrecipitationSurplus.objects.get(
-                        date=_first_of_hour(dt)
-                     ).count()
-
+                date=_first_of_hour(dt)).count()
             return counts
         except PrecipitationSurplus.DoesNotExist:
-            # nieuwe precipitationsurplusobjecten in database stoppen
-            WaterRegimeShape.objects.all()
-            t1 = dt
-            t2 = dt + timedelta(days=-7)
-
-            print(t1)
-            print(t2)
-            print(list(TimeSeriesFactory.get('E_MARKNESSE').events(t1,t2)))
+            pass
+        
+        # nieuwe precipitationsurplusobjecten in database stoppen
+        
+        tmax = int(abs(Constant.get("Tmax")))
+        t1 = dt + timedelta(days=-tmax)
+        t2 = dt
+        
+        ## Get events of all timeseries we need.
+        ## Events may be shared among shapes!
+        
+        events = {}
+        
+        for s in set(timeseries_dict.itervalues()):
+            events[s] = tuple(TimeSeriesFactory.get(s).events(t1,t2))
             
-            # get the events
-            events = {}
-            for s in set(timeseries_dict.itervalues()):
-                events[s] = TimeSeriesFactory.get(s).events(t1,t2)
-
-            # get the shapes
-            shapes = WaterRegimeShape.objects.all()
-
-            # tidying up:
-            p_events = {}
-            e_events = {}
-            c_events = {}
+        ## Assign events to shapes.
+        
+        p_events = {}
+        e_events = {}
+        c_events = {}
+        pday = {}
+        eact = {}
+        
+        for s in WaterRegimeShape.objects.all():
             
-            for s in shapes:
-                p_events[s.afdeling] = events[timeseries_dict['P_' + s.afdeling]]
-                e_events[s.afdeling] = events[timeseries_dict['E_' + s.afdeling]]
+            p_events[s.afdeling] = events[timeseries_dict['P_' + s.afdeling]]
+            e_events[s.afdeling] = events[timeseries_dict['E_' + s.afdeling]]
+            
+            c_events[s.afdeling] = [
+                (d, s.get_cropfactor(d)) for d, v in e_events[s.afdeling]
+            ]
+            
+            # todo here:
+            #   convert p_events to daily
+            #pday[s.afdeling] = cls.make_daily(p_events)
+            
+            #   multiply e_events by c_events values (use the multiply... method)
+            eact[s.afdeling] = cls.multiply_event_values(e_events[s.afdeling], c_events[s.afdeling])
+            
+            #   subtract p from e, use the subtract method
+            #   use weighting method
+            # save() the values in the database for each shape.
 
-                c_events[s.afdeling] = [
-                    (d,s.get_cropfactor(d)) for d,v in e_events[s.afdeling]
-                ]
-
-                # todo here:
-                #   convert p_events to daily
-                #   multiply e_events by c_events values (use the multiply... method)
-                #   subtract p from e, use the subtract method
-                #   use weighting method
-                # save() the values in the database for each shape.
-            return 0
-
-    @classmethod        
+        afd = 'LANOP'
+        print pday[afd]
+        return 0
+    
+    @classmethod
     def test(cls):
-        print cls.refresh(datetime.now())
+        dt = datetime(2011, 3, 30)
+        print cls.refresh(dt)
         
 
 
