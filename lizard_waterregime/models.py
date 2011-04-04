@@ -300,6 +300,6 @@ class Range(models.Model):
 
 class PrecipitationSurplus(models.Model):
     waterregimeshape = models.ForeignKey(WaterRegimeShape)
-    date = models.DateTimeField()
+    date = models.DateTimeField(db_index = True)
     value = models.FloatField()
 
