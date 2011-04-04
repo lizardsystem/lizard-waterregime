@@ -47,11 +47,17 @@ class RegimeCalculator(object):
         """Return an array of weightfactors with length (tmax * stretch).
         
         Each value represents the weight of a given value in the total P, E
-        or P-E. The most recent value, with the highest weight, is last."""
+        or P-E. The most recent value, with the highest weight, is first,
+        since it is inded to be used with numpy.convolve() which flips its
+        second argument. The sum of the resulting list is equal to stretch.
+        In this way the result of the weighting is always a daily value, even
+        if the values to be weighted are for example hourly."""
         days = arange(-tmax + 1.,1)
         factors = 1 / abs(days - r)
-        stretched_factors = (factors.reshape(tmax,1) * ones((tmax,stretch))).ravel()
-        normalized_factors = stretched_factors / sum(stretched_factors)
+        stretched_factors = (factors.reshape(tmax, 1) *
+                                ones((tmax, stretch))).ravel()
+        normalized_factors = (stretched_factors / 
+                                sum(stretched_factors) * stretch)
         return normalized_factors
 
 
@@ -60,34 +66,10 @@ class RegimeCalculator(object):
         """ Return array of weighted events."""
         dates,values = array([list(events)]).transpose()
 
-        print "in weighted_events"
-        
-        print "\ndates"
-        print dates
-        
-        print "\nvalues"
-        print values
-        
-        print "\nweights"
-        print weights
-        
-        ## Arjan, unused?        
-        weighted_dates = dates[weights.size - 1:]
-
-        ## Arjan, the convolution operator flips the weights array before sliding?
-        weights = weights[ ::-1 ]
-        print "\nreversed weights"
-        print weights
-        
         weighted_values = convolve(values.reshape(-1,),weights,'valid')
+        weighted_dates = dates[weights.size - 1:].reshape(-1)
+        return vstack((weighted_dates,weighted_values)).transpose()
         
-        print "\nweighted_values"
-        print weighted_values
-        
-        # Arjan, dit doet het nog niet? 
-        #return vstack((daily_dates,daily_values)).transpose()
-        return weighted_values
-
         
     @classmethod
     def make_hourly(cls, events):
@@ -134,6 +116,7 @@ class RegimeCalculator(object):
             (pair[0][0], pair[0][1] - pair[1][1])
             for pair in zip(list(events_a),list(events_b))]
 
+
     @classmethod
     def multiply_event_values(cls, events_a, events_b):
         """ Return events with dates from a and values a * b """
@@ -141,18 +124,10 @@ class RegimeCalculator(object):
             (pair[0][0], pair[0][1] * pair[1][1])
             for pair in zip(list(events_a),list(events_b))]
 
-## Arjan, we hebben al een methode met deze naam?
-#    @classmethod
-#    def multiply_event_values(cls, events, factor):
-#        """ Return events with values multiplied by factor """
-#        return [(e[0], e[1] * factor) for e in events]
-
     @classmethod
     def refresh(cls,dt):
         """ Check and if necessary insert precipitationsurplus values in
         database for datetime """
-        
-        ## Arjan, try block werkt niet. Wat wil je hier doen?
         
         try:
             counts = PrecipitationSurplus.objects.get(
@@ -160,67 +135,73 @@ class RegimeCalculator(object):
             return counts
         except PrecipitationSurplus.DoesNotExist:
             pass
-        
-        # nieuwe precipitationsurplusobjecten in database stoppen
-        
-        tmax = int(abs(Constant.get("Tmax")))
-        t1 = dt - timedelta(days=tmax)
-        t1 = t1 + timedelta(hours=1)
-        t2 = dt
-        
-        print t1
-        print t2
-        
-        ## Get events of all timeseries we need.
-        ## Events may be shared among shapes!
-        
-        events = {}
-        
-        for s in set(timeseries_dict.itervalues()):
-            events[s] = tuple(TimeSeriesFactory.get(s).events(t1,t2))
-        
-        ## Assign events to shapes.
-        
-        p_events = {}
-        e_events = {}
-        c_events = {}
-        pday = {}
-        eact = {}
-        pmine = {}
-        wpmine = {}
-        
-        weights = cls.weights()
-        
-        for s in WaterRegimeShape.objects.all():
-            
-            p_events[s.afdeling] = events[timeseries_dict['P_' + s.afdeling]]
-            e_events[s.afdeling] = events[timeseries_dict['E_' + s.afdeling]]
 
-            c_events[s.afdeling] = [
-                (d, s.get_cropfactor(d)) for d, v in e_events[s.afdeling]
-            ]
-            
-            # todo here:
-            #   convert p_events to daily
-            pday[s.afdeling] = cls.make_daily(p_events[s.afdeling])
-            
-            #   multiply e_events by c_events values (use the multiply... method)
-            eact[s.afdeling] = cls.multiply_event_values(e_events[s.afdeling], c_events[s.afdeling])
-            
-            #   subtract p from e, use the subtract method
-            pmine[s.afdeling] = cls.subtract_event_values(pday[s.afdeling], eact[s.afdeling])
-            
-            #   use weighting method
-            wpmine[s.afdeling] = cls.weighted_events(pmine[s.afdeling], weights)
-            
-            # save() the values in the database for each shape.
+        tmax = int(abs(Constant.get('Tmax')))
+        # 1 second less, to prevent a value to much
+        date1 = dt - timedelta(days=tmax, seconds=-1)
+        date2 = dt
 
-        return 0
+        shapes = WaterRegimeShape.objects.all()
+
+        for s in shapes:
+            pmine,p,e = cls.weighted_precipitation_surplus(
+                s.afdeling, date1, date2)
+            p = PrecipitationSurplus(
+                waterregimeshape=s,
+                date=_first_of_hour(dt),
+                value=pmine[0][1],
+            )
+            p.save()
+
+
+    @classmethod
+    def weighted_precipitation_surplus(
+        cls, area, date1, date2):
+        """Return all data tuple of weighted events weighted. Since daily
+        values maybe required, everything is converted to daily."""
+        
+        tmax = abs(int(Constant.get('Tmax')))
+        r = abs(int(Constant.get('R_' + area)))
+
+        weights = cls.weights(r=r, tmax=tmax, stretch=24)
+        shape = WaterRegimeShape.objects.get(afdeling=area)
+        
+        p_series = TimeSeriesFactory.get(timeseries_dict['P_' + area])
+        e_series = TimeSeriesFactory.get(timeseries_dict['E_' + area])
+
+        
+        # P must be hourly anyway
+        if p_series.hours == 24:
+            p_events_hourly = cls.make_hourly(p_series.events(date1,date2))
+        elif p_series.hours == 1:
+            p_events_hourly = tuple(p_series.events(date1,date2))
+        # else: raise some error?
+
+        # E daily is also necessary, to reduce load on the 
+        # get_cropfactor() method.
+        if e_series.hours == 24:
+            eref_events_daily = tuple(e_series.events(date1,date2))
+            eref_events_hourly = cls.make_hourly(eref_events_daily)
+        elif e_series.hours == 1:
+            eref_events_hourly = tuple(e_series.events(date1,date2))
+            eref_events_daily = cls.make_daily(eref_events_hourly)
+        # else: raise some error?
+
+        c_events_daily = [(dt, shape.get_cropfactor(dt))
+                        for dt, v in eref_events_daily]
+        c_events_hourly = cls.make_hourly(c_events_daily)
+                        
+        e_events_hourly = cls.multiply_event_values(
+                            eref_events_hourly,c_events_hourly)
+
+                            
+        p_weighted = cls.weighted_events(p_events_hourly, weights)
+        e_weighted = cls.weighted_events(e_events_hourly, weights)
+        
+        pmine_weighted = cls.subtract_event_values(p_weighted, e_weighted)
+
+        return pmine_weighted,p_weighted,e_weighted
     
     @classmethod
     def test(cls):
-        dt = datetime(2011, 1, 31, 1)
-        print cls.refresh(dt)
-        
-
-
+        cls.refresh(datetime.now())
