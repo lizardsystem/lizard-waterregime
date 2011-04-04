@@ -60,11 +60,33 @@ class RegimeCalculator(object):
         """ Return array of weighted events."""
         dates,values = array([list(events)]).transpose()
 
+        print "in weighted_events"
+        
+        print "\ndates"
+        print dates
+        
+        print "\nvalues"
+        print values
+        
+        print "\nweights"
+        print weights
+        
+        ## Arjan, unused?        
         weighted_dates = dates[weights.size - 1:]
 
-        print weights.shape
+        ## Arjan, the convolution operator flips the weights array before sliding?
+        weights = weights[ ::-1 ]
+        print "\nreversed weights"
+        print weights
+        
         weighted_values = convolve(values.reshape(-1,),weights,'valid')
-        return vstack((daily_dates,daily_values)).transpose()
+        
+        print "\nweighted_values"
+        print weighted_values
+        
+        # Arjan, dit doet het nog niet? 
+        #return vstack((daily_dates,daily_values)).transpose()
+        return weighted_values
 
         
     @classmethod
@@ -142,8 +164,12 @@ class RegimeCalculator(object):
         # nieuwe precipitationsurplusobjecten in database stoppen
         
         tmax = int(abs(Constant.get("Tmax")))
-        t1 = dt + timedelta(days=-tmax)
+        t1 = dt - timedelta(days=tmax)
+        t1 = t1 + timedelta(hours=1)
         t2 = dt
+        
+        print t1
+        print t2
         
         ## Get events of all timeseries we need.
         ## Events may be shared among shapes!
@@ -152,7 +178,7 @@ class RegimeCalculator(object):
         
         for s in set(timeseries_dict.itervalues()):
             events[s] = tuple(TimeSeriesFactory.get(s).events(t1,t2))
-            
+        
         ## Assign events to shapes.
         
         p_events = {}
@@ -160,34 +186,40 @@ class RegimeCalculator(object):
         c_events = {}
         pday = {}
         eact = {}
+        pmine = {}
+        wpmine = {}
+        
+        weights = cls.weights()
         
         for s in WaterRegimeShape.objects.all():
             
             p_events[s.afdeling] = events[timeseries_dict['P_' + s.afdeling]]
             e_events[s.afdeling] = events[timeseries_dict['E_' + s.afdeling]]
-            
+
             c_events[s.afdeling] = [
                 (d, s.get_cropfactor(d)) for d, v in e_events[s.afdeling]
             ]
             
             # todo here:
             #   convert p_events to daily
-            #pday[s.afdeling] = cls.make_daily(p_events)
+            pday[s.afdeling] = cls.make_daily(p_events[s.afdeling])
             
             #   multiply e_events by c_events values (use the multiply... method)
             eact[s.afdeling] = cls.multiply_event_values(e_events[s.afdeling], c_events[s.afdeling])
             
             #   subtract p from e, use the subtract method
+            pmine[s.afdeling] = cls.subtract_event_values(pday[s.afdeling], eact[s.afdeling])
+            
             #   use weighting method
+            wpmine[s.afdeling] = cls.weighted_events(pmine[s.afdeling], weights)
+            
             # save() the values in the database for each shape.
 
-        afd = 'LANOP'
-        print pday[afd]
         return 0
     
     @classmethod
     def test(cls):
-        dt = datetime(2011, 3, 30)
+        dt = datetime(2011, 1, 31, 1)
         print cls.refresh(dt)
         
 
