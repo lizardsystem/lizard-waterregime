@@ -1,3 +1,5 @@
+# Carsten, search for your name below...
+
 import logging
 import mapnik
 import os
@@ -20,6 +22,7 @@ from lizard_map.symbol_manager import SymbolManager
 from lizard_waterregime.models import WaterRegimeShape
 from lizard_waterregime.models import Regime
 from lizard_waterregime.models import Season
+from lizard_waterregime.calculator import RegimeCalculator
 
 logger = logging.getLogger('nens.waterregimeadapter')
 
@@ -112,17 +115,28 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
         styles = {}
 
         db_settings = settings.DATABASES['default']
+
+        # refresh the p min e values in the database if necessary
+        now = datetime.now()
+        RegimeCalculator.refresh(now)
+        datesql = (
+            "to_timestamp('" + now.strftime('%Y%m%d%H') + "','YYYYMMDDHH24')"
+        )
         shape_view = str("""(
             select
-                gid,
-                afdeling,
-                naam,
-                area_m2,
-                the_geom,
-                gid * 5 - 12 as value
+                shp.gid,
+                shp.afdeling,
+                shp.naam,
+                shp.area_m2,
+                shp.the_geom,
+                pme.value
             from
-                lizard_waterregime_waterregimeshape) result_view
-        """)
+                lizard_waterregime_waterregimeshape shp
+                join lizard_waterregime_precipitationsurplus pme
+                    on pme.waterregimeshape_id = shp.gid
+            where
+                pme.date = """ + datesql + """) result_view""")
+        print shape_view
         layer = mapnik.Layer('Geometry from PostGIS')
         # RD = rijksdriehoek. Somehow 'Google' is also mentioned originally?
         layer.srs = RD
@@ -288,17 +302,26 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
         graph = adapter.Graph(start_date, end_date, width, height)
         graph.add_today()
 
-        # Plot testdata.
+        # Carsten: This doesn't work yet, since dates and values are in one
+        # Array and matplotlib wants them separately. Moreover, the area
+        # Has to be extracted from the identifier_list parameter, so that
+        # we don't see the same graph for all area's.
+        values,valuesP,valuesE = RegimeCalculator.weighted_precipitation_surplus(
+        'HANOP', start_date, end_date)
+
+        # Plot fake testdata.
         dates, values = self._get_fake_data(
             identifier_list, start_date, end_date
         )
+        
         valuesP = [value * 1.2 for value in values]
         valuesE = [value * 0.2 for value in values]
+
         graph.axes.plot(dates, values,'darkgreen', label='P - E', linewidth=2)
         graph.axes.plot(dates, valuesP,color='gray', label='P')
         graph.axes.plot(
             dates, valuesE,color='gray', label='E',linestyle='--')
-        
+
         # Create an extra margin outside the data
         margin = 0.1 # Fraction of ylim padding outside data
         allvalues = values + valuesP + valuesE
