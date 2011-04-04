@@ -127,32 +127,31 @@ class RegimeCalculator(object):
     @classmethod
     def refresh(cls,dt):
         """ Check and if necessary insert precipitationsurplus values in
-        database for datetime """
+        database for datetime.
         
-        try:
-            counts = PrecipitationSurplus.objects.get(
-                date=_first_of_hour(dt)).count()
-            return counts
-        except PrecipitationSurplus.DoesNotExist:
-            pass
+        To be called from the waterregime adapter"""
+        
+        if PrecipitationSurplus.objects.filter(date=_first_of_hour(dt)).exists():
+            return False
+        else:
+            tmax = int(abs(Constant.get('Tmax')))
+            # 1 second less, to prevent a value to much
+            date1 = dt - timedelta(days=tmax, seconds=-1)
+            date2 = dt
 
-        tmax = int(abs(Constant.get('Tmax')))
-        # 1 second less, to prevent a value to much
-        date1 = dt - timedelta(days=tmax, seconds=-1)
-        date2 = dt
+            shapes = WaterRegimeShape.objects.all()
 
-        shapes = WaterRegimeShape.objects.all()
+            for s in shapes:
+                pmine,p,e = cls.weighted_precipitation_surplus(
+                    s.afdeling, date1, date2)
+                p = PrecipitationSurplus(
+                    waterregimeshape=s,
+                    date=_first_of_hour(dt),
+                    value=pmine[0][1],
+                )
+                p.save()
 
-        for s in shapes:
-            pmine,p,e = cls.weighted_precipitation_surplus(
-                s.afdeling, date1, date2)
-            p = PrecipitationSurplus(
-                waterregimeshape=s,
-                date=_first_of_hour(dt),
-                value=pmine[0][1],
-            )
-            p.save()
-
+            return True
 
     @classmethod
     def weighted_precipitation_surplus(
