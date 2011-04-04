@@ -29,24 +29,26 @@ class WaterRegimeShape(models.Model):
         weighted according to the fraction it contributes to the total area.
         """
 
-        ## The calculated value will be cached for performance.
+        ## Each instance has a set of LandCoverData (LCD).
+        ## Caching its elements is worthwhile.
 
-        key = self.afdeling + date.strftime(".%m%d") ## E.g. LANOP.0403
-        value = cache.get(key) ## Weighted crop factor (float)
+        key = "%s.LCD" % self.afdeling
+        lcd = cache.get(key)
 
-        if not value:
+        if not lcd:
 
-            value = 0
+            ## Without select_related() the database will be hit each
+            ## time we navigate over cover in the for loop below!
 
-            ## Without select_related() the database will be hit
-            ## each time we navigate over cover in the loop.
+            lcd = tuple(self.landcoverdata_set.select_related('cover'))
+            cache.set(key, lcd, CACHE_EXPIRES)
 
-            for land in self.landcoverdata_set.select_related('cover'):
-                value += land.fraction * land.cover.get_cropfactor(date)
+        factor = 0
 
-            cache.set(key, value, CACHE_EXPIRES)
+        for land in lcd:
+            factor += land.fraction * land.cover.get_cropfactor(date)
 
-        return value
+        return factor
 
 
 class LandCover(models.Model):
