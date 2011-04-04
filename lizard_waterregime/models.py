@@ -3,33 +3,50 @@
 
 # Create your models here.
 
+from datetime import date
 from datetime import datetime
 from datetime import timedelta
 from django.contrib.gis.db import models
+from django.core.cache import cache
 from lizard_fewsunblobbed.models import Filter
 from lizard_fewsunblobbed.models import Location
 from lizard_fewsunblobbed.models import Parameter
 from lizard_fewsunblobbed.models import Timeserie
 
+CACHE_EXPIRES = 5 * 60 ## 5 minutes
+
 
 class WaterRegimeShape(models.Model):
     gid = models.IntegerField(primary_key=True)
-    afdeling = models.CharField(max_length=5)
+    afdeling = models.CharField(max_length=5, unique=True)
     naam = models.CharField(max_length=50)
     area_m2 = models.DecimalField(max_digits=20, decimal_places=10)
     the_geom = models.MultiPolygonField(srid= -1)
     objects = models.GeoManager()
 
-    def get_cropfactor(self, date):
+    def get_cropfactor(self, date=date.today()):
         """ Returns a weighted crop factor: each land cover's crop factor is
         weighted according to the fraction it contributes to the total area.
         """
-        ## This is nicely OO, but will hit the database once for each
-        ## iteration. Without select_related() even twice!
-        cropfactor = 0
-        for land in self.landcoverdata_set.select_related('cover'):
-            cropfactor += land.fraction * land.cover.get_cropfactor(date)
-        return cropfactor
+
+        ## The calculated value will be cached for performance.
+
+        key = self.afdeling + date.strftime(".%m%d") ## E.g. LANOP.0403
+        value = cache.get(key) ## Weighted crop factor (float)
+
+        if not value:
+
+            value = 0
+
+            ## Without select_related() the database will be hit
+            ## each time we navigate over cover in the loop.
+
+            for land in self.landcoverdata_set.select_related('cover'):
+                value += land.fraction * land.cover.get_cropfactor(date)
+
+            cache.set(key, value, CACHE_EXPIRES)
+
+        return value
 
 
 class LandCover(models.Model):
@@ -38,9 +55,25 @@ class LandCover(models.Model):
     """
     name = models.CharField(max_length=64, unique=True)
 
-    def get_cropfactor(self, date):
-        return self.cropfactor_set.only('factor').get(
-            month=date.month, day=date.day).factor
+    def get_cropfactor(self, date=date.today()):
+        """ Returns the crop factor - the value that is, not the object -
+        for this particular type of land cover at the specified date.
+        """
+
+        ## Given the application, it's highly likely that we'll also
+        ## need crop factors for other types of land cover at this
+        ## date. We'll get them all at once and cache them for
+        ## efficiency.
+
+        key = "CF" + date.strftime(".%m%d") ## E.g. CF.0403
+        value = cache.get(key) ## Crop factors (dict)
+
+        if not value:
+            cfs = CropFactor.objects.filter(month=date.month, day=date.day)
+            value = dict((cf.crop_id, cf.factor) for cf in cfs)
+            cache.set(key, value, CACHE_EXPIRES)
+
+        return value[self.pk]
 
 
 class LandCoverData(models.Model):
@@ -95,31 +128,32 @@ class TimeSeries(object):
     """ Super class of all TimeSeries implementations. Not to be instantiated
     directly: should be considered as an abstract base class.
     """
+
     def events(self, start=datetime.min, end=datetime.max, missing=None):
         """ Returns all events between [start, end]. By default, any
         missing values between the first and last event are replaced
         by None. Magic values, e.g. -999.0, are not considered as
         missing - only datetimes that are completely absent.
         This might be better handled at the fews level?
-        
+
         This method makes quite some assumptions about the data:
-        
+
         1) Events are spaced at uniform time intervals.
         2) Naive datetime objects (no timezone).
         3) All datetimes are nicely rounded.
         4) Events are in ascending order.
-        
+
         For example:
-        
+
         2011-04-01 09:00,  123.4
         2011-04-01 11:00, -999.0
-        
+
         becomes:
-        
+
         2011-04-01 09:00,  123.4
         2011-04-01 10:00,  None
         2011-04-01 11:00, -999.0
-        
+
         """
         next = datetime.max
         delta = timedelta(hours=self.hours)
@@ -168,7 +202,7 @@ class FewsTimeSeries(models.Model, TimeSeries):
     """
     name = models.CharField(max_length=64, unique=True)
     hours = models.IntegerField() ## timedelta
-    
+
     ## Fews timeseries are uniquely defined by the following 5
     ## fields. We do rely on primary keys, because these may
     ## vary across imports.
