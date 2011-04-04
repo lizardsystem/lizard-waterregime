@@ -13,8 +13,6 @@ from lizard_fewsunblobbed.models import Location
 from lizard_fewsunblobbed.models import Parameter
 from lizard_fewsunblobbed.models import Timeserie
 
-CACHE_EXPIRES = 5 * 60 ## 5 minutes
-
 
 class WaterRegimeShape(models.Model):
     gid = models.IntegerField(primary_key=True)
@@ -41,7 +39,7 @@ class WaterRegimeShape(models.Model):
             ## time we navigate over cover in the for loop below!
 
             lcd = tuple(self.landcoverdata_set.select_related('cover'))
-            cache.set(key, lcd, CACHE_EXPIRES)
+            cache.set(key, lcd)
 
         factor = 0
 
@@ -73,7 +71,7 @@ class LandCover(models.Model):
         if not value:
             cfs = CropFactor.objects.filter(month=date.month, day=date.day)
             value = dict((cf.crop_id, cf.factor) for cf in cfs)
-            cache.set(key, value, CACHE_EXPIRES)
+            cache.set(key, value)
 
         return value[self.pk]
 
