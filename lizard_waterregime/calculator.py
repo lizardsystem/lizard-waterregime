@@ -31,17 +31,38 @@ timeseries_dict = {
         'P_TANOP' : 'P_TANOP',
 }
 
-
 class RegimeCalculator(object):
     """ Calculation methods for the waterregime djangoapp.
     
     TODO: Many methods transform lists into arrays and / or return arrays.
     Better to transform at one place instead of back and forth for each
-    method."""
+    method.
+    """
     
+    @classmethod
+    def map_events(p_series, e_series):
+        """
+        """
 
-    
-        
+        p_mapped = []
+        e_mapped = []
+        e_dict = dict((event[0], event[1]) for event in e_series)
+
+        for event in p_series:
+            dt = event[0]
+            e = e_dict[datetime(dt.year, dt.month, dt.day)]
+            if not e:
+                e = cls.nearest(dt, e_series)
+            if e:
+                p_mapped.append(event)
+                e_mapped.append((dt, e))
+
+        return p_mapped, e_mapped
+
+    @classmethod
+    def nearest(dt, series):
+        return None
+
     @classmethod
     def weights(cls,r=1.5, tmax=7, stretch=1):
         """Return an array of weightfactors with length (tmax * stretch).
@@ -203,4 +224,5 @@ class RegimeCalculator(object):
     
     @classmethod
     def test(cls):
-        cls.refresh(datetime.now())
+        #cls.refresh(datetime.now())
+        RegimeCalculator.align((1,2), (1,2,3))
