@@ -302,10 +302,6 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
         graph = adapter.Graph(start_date, end_date, width, height)
         graph.add_today()
 
-        # Carsten: This doesn't work yet, since dates and values are in one
-        # Array and matplotlib wants them separately. Moreover, the area
-        # Has to be extracted from the identifier_list parameter, so that
-        # we don't see the same graph for all area's.
         # Plot fake testdata.
         dates, values = self._get_fake_data(
             identifier_list, start_date, end_date
@@ -317,16 +313,22 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
         valuesP = [value * 1.2 for value in values]
         valuesE = [value * 0.2 for value in values]
 
-        graph.axes.plot(dates, values,'darkgreen', label='P - E', linewidth=2)
-        graph.axes.plot(dates, valuesP,color='gray', label='P')
-        graph.axes.plot(
-            dates, valuesE,color='gray', label='E',linestyle='--')
+        graph.axes.plot(events_weighted_pmine[:,0],events_weighted_pmine[:,1],'darkgreen', label='P - E', linewidth=2)
+        graph.axes.plot(events_p[:,0],events_p[:,1],color='gray', label='P')
+        graph.axes.plot(events_e[:,0],events_e[:,1],color='gray', label='E',linestyle='--')
 
         # Create an extra margin outside the data
         margin = 0.1 # Fraction of ylim padding outside data
-        allvalues = values + valuesP + valuesE
-        lowest_value = min(allvalues)
-        highest_value = max(allvalues)
+        lowest_value = min(
+            min(events_weighted_pmine[:,1]),
+            min(events_p[:,1]),
+            min(events_e[:,1]),
+        )
+        highest_value = max(
+            max(events_weighted_pmine[:,1]),
+            max(events_p[:,1]),
+            max(events_e[:,1]),
+        )    
         span = highest_value - lowest_value
         graph.axes.set_ylim(
             lowest_value - margin * span,
