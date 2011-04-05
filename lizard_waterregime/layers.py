@@ -223,15 +223,15 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
             "lizard_waterregime.workspace_item_bar_image",
             kwargs={'workspace_item_id': self.workspace_item.id},
             )
-
+        afdeling = "?afdeling=" + identifiers[0]['afdeling']
         return super(AdapterWaterRegime, self).html_default(
             snippet_group=snippet_group,
             identifiers=identifiers,
             layout_options=layout_options,
             template='lizard_waterregime/popup.html',
             extra_render_kwargs={
-                'graph_img_url':graph_img_url,
-                'bar_img_url':bar_img_url,
+                'graph_img_url': graph_img_url + afdeling,
+                'bar_img_url': bar_img_url,
             }
         )        
             
@@ -306,14 +306,14 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
         # Array and matplotlib wants them separately. Moreover, the area
         # Has to be extracted from the identifier_list parameter, so that
         # we don't see the same graph for all area's.
-        values,valuesP,valuesE = RegimeCalculator.weighted_precipitation_surplus(
-        'HANOP', start_date, end_date)
-
         # Plot fake testdata.
         dates, values = self._get_fake_data(
             identifier_list, start_date, end_date
         )
-        
+        shape = WaterRegimeShape.objects.get(afdeling=identifier_list[0]['afdeling'])
+        events_weighted_pmine,events_p,events_e = RegimeCalculator.weighted_precipitation_surplus(
+        shape, start_date, end_date)
+
         valuesP = [value * 1.2 for value in values]
         valuesE = [value * 0.2 for value in values]
 
