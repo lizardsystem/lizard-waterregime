@@ -1,5 +1,3 @@
-# Carsten, search for your name below...
-
 import logging
 import mapnik
 import os
@@ -37,10 +35,11 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
 
     Registered as adapter_waterregime.
     Uses default database table "water_regime_shape" as geo database.
-    Set the regimedatetime attribute for"""
+    Set the regimedatetime attribute to determine for which moment the colors
+    on the map are shown. """
 
     regimedatetime = datetime.now()
-    regimedatetime = datetime.now()+timedelta(days=10)
+    regimedatetime = datetime(2011,3,28)
 
     def _season(self):
         """Return a Season object."""
@@ -70,7 +69,7 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
             for r in regimeranges:
                 # only append filter and color if at least one range is set
                 if r.lower_limit or r.upper_limit:
-                    mapnik_filter = ''
+                    mapnik_filter = "[valid] = 'Y' and "
                     if r.lower_limit:
                         mapnik_filter += '[value] > ' + str(r.lower_limit)
                     if r.lower_limit and r.upper_limit:
@@ -79,6 +78,11 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
                         mapnik_filter += '[value] <= ' + str(r.upper_limit)
                     filters.append(mapnik_filter)
                     colors.append(r.regime.color_255())
+
+                # Extra filter for invalid pmine's
+                filters.append("[valid] = 'N'")
+                colors.append((127,0,127,63))
+
 
             return zip(colors,filters)
 
@@ -117,11 +121,7 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
         db_settings = settings.DATABASES['default']
 
         # refresh the p min e values in the database if necessary
-        now = datetime.now()
-        RegimeCalculator.refresh(now)
-        datesql = (
-            "to_timestamp('" + now.strftime('%Y%m%d%H') + "','YYYYMMDDHH24')"
-        )
+        RegimeCalculator.refresh(self.regimedatetime)
         shape_view = str("""(
             select
                 shp.gid,
@@ -129,13 +129,13 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
                 shp.naam,
                 shp.area_m2,
                 shp.the_geom,
-                pme.value
+                pme.value,
+                pme.valid
             from
                 lizard_waterregime_waterregimeshape shp
                 join lizard_waterregime_precipitationsurplus pme
                     on pme.waterregimeshape_id = shp.gid
-            where
-                pme.date = """ + datesql + """) result_view""")
+        ) result_view""")
         layer = mapnik.Layer('Geometry from PostGIS')
         # RD = rijksdriehoek. Somehow 'Google' is also mentioned originally?
         layer.srs = RD
@@ -184,10 +184,17 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
         for feature in feature_set.features:
             afdeling = feature.properties['afdeling']
             gid = feature.properties['gid']
-            popup_string = (
-                'Gewogen P-E: %1.1f mm/dag (%s)' % (
-                    feature.properties['value'], afdeling[:2]+'-'+afdeling[2:])
-            )
+            valid = feature.properties['valid']
+            value = feature.properties['value']
+            if valid == 'Y':
+                precipitationsurplus = '%1.1f mm/dag' % value
+            else:                
+                precipitationsurplus = 'Onbekend'
+            popup_string = ('Gewogen P-E: %s (%s) op <br />%s' % (
+                    precipitationsurplus,
+                    afdeling[:2]+'-'+afdeling[2:],
+                    self.regimedatetime
+            ))
             identifier = {
                 'afdeling': afdeling,
                 'google_x': google_x,
@@ -280,15 +287,6 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
 
         return (0,1,0,0)
 
-    def _get_fake_data(self,identifier_list, start_date, end_date):
-        """Make up some testdata."""
-        from numpy import sin
-        from numpy import arange
-        numbers = arange(int(date2num(start_date)),int(date2num(end_date)))
-        dates = [num2date(num) for num in numbers]
-        values = list(10. * sin(numbers / 4. ) + 5.)
-        return dates,values
-
     def graph_image(self, identifier_list,start_date, end_date,
                     width=None, height=None, layout_extra=None):
         """Visualize scores or measures in a graph each row is an area."""
@@ -301,29 +299,50 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
         graph = adapter.Graph(start_date, end_date, width, height)
         graph.add_today()
 
-        shape = WaterRegimeShape.objects.get(afdeling=identifier_list[0]['afdeling'])
-        events_weighted_pmine,events_p,events_e = RegimeCalculator.weighted_precipitation_surplus(
-        shape, start_date, end_date)
+        shape = WaterRegimeShape.objects.get(
+            afdeling=identifier_list[0]['afdeling']
+        )
+        
+        events_weighted_pmine,events_p,events_e = (
+            RegimeCalculator.weighted_precipitation_surplus(
+                shape,
+                datetime(start_date.year, start_date.month, start_date.day),
+                datetime(end_date.year, end_date.month, end_date.day)
+            )
+        )
 
-        graph.axes.plot(events_weighted_pmine[:,0],events_weighted_pmine[:,1],
-            'darkgreen', label='P - E', linewidth=2)
-        graph.axes.plot(events_p[:,0],events_p[:,1],
-            color='gray', label='P')
-        graph.axes.plot(events_e[:,0],events_e[:,1],
-            color='gray', label='E',linestyle='--')
+        if events_weighted_pmine.size > 0:
+            graph.axes.plot(
+                events_weighted_pmine[:,0],
+                events_weighted_pmine[:,1],
+                'darkgreen', label='P - E (mm/dag)', linewidth=2)
+        if events_p.size > 0:
+            graph.axes.plot(events_p[:,0],events_p[:,1],
+                color='blue', label='P (mm/uur)',linestyle='-',marker='.')
+        if events_e.size > 0:
+            graph.axes.plot(events_e[:,0],events_e[:,1],
+                color='red', label='E (mm/dag)',linestyle='',marker='o')
 
         # Create an extra margin outside the data
         margin = 0.1 # Fraction of ylim padding outside data
-        lowest_value = min(
-            min(events_weighted_pmine[:,1]),
-            min(events_p[:,1]),
-            min(events_e[:,1]),
-        )
-        highest_value = max(
-            max(events_weighted_pmine[:,1]),
-            max(events_p[:,1]),
-            max(events_e[:,1]),
-        )    
+        mins = []
+        maxs = []
+
+        for arr in (events_weighted_pmine,events_p,events_e):
+            if arr.size > 0:
+                mins.append(min(arr[:,1]))
+                maxs.append(max(arr[:,1]))
+
+        if len(mins) == 0:
+            lowest_value = 0.
+        else:
+            lowest_value = min(mins)
+
+        if len(maxs) == 0:
+            highest_value = 1.
+        else:
+            highest_value = max(maxs)
+
         span = highest_value - lowest_value
         graph.axes.set_ylim(
             lowest_value - margin * span,
@@ -331,10 +350,13 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
         )
         
         # Labeling and legend position
-        graph.axes.set_ylabel('Neerslagoverschot (mm/dag)')
+        #graph.axes.set_ylabel('Neerslagoverschot (mm/dag)')
         graph.axes.legend(loc=3)
 
-        return graph.http_png()
+        response = graph.http_png()
+        response['Cache-Control'] = 'max-age=15' 
+
+        return response
 
     def bar_image(self, identifier_list, start_date, end_date,
         width=None, height=None, layout_extra=None):
@@ -345,9 +367,17 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
         if height is None:
             height = 170.0
 
-        shape = WaterRegimeShape.objects.get(afdeling=identifier_list[0]['afdeling'])
-        events_weighted_pmine,events_p,events_e = RegimeCalculator.weighted_precipitation_surplus(
-        shape, start_date, end_date)
+        shape = WaterRegimeShape.objects.get(
+            afdeling=identifier_list[0]['afdeling']
+        )
+        
+        events_weighted_pmine,events_p,events_e = (
+            RegimeCalculator.weighted_precipitation_surplus(
+                shape,
+                datetime(start_date.year, start_date.month, start_date.day),
+                datetime(end_date.year, end_date.month, end_date.day)
+            )
+        )
 
         graph = adapter.Graph(start_date, end_date, width, height)
         graph.add_today()
@@ -360,7 +390,9 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
         ) for dt in events_weighted_pmine[:,0]]
         yrange = (0.1,0.8)
 
-        graph.axes.broken_barh(xranges,yrange,facecolors=colors,linewidth=0)
+        graph.axes.broken_barh(xranges,yrange,facecolors=colors,linewidth=0,
+        antialiased=False,
+        )
 
         # Legend building
         from matplotlib.patches import Rectangle
@@ -377,7 +409,11 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
         graph.axes.grid()
         graph.axes.set_yticks([])
         graph.axes.set_ylabel('Regime')
-        return graph.http_png()
+
+        response = graph.http_png()
+        response['Cache-Control'] = 'max-age=15' 
+
+        return response
 
     def symbol_url(self, identifier=None, start_date=None, end_date=None,
                    icon_style=None):
