@@ -136,7 +136,6 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
                     on pme.waterregimeshape_id = shp.gid
             where
                 pme.date = """ + datesql + """) result_view""")
-        print shape_view
         layer = mapnik.Layer('Geometry from PostGIS')
         # RD = rijksdriehoek. Somehow 'Google' is also mentioned originally?
         layer.srs = RD
@@ -302,20 +301,16 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
         graph = adapter.Graph(start_date, end_date, width, height)
         graph.add_today()
 
-        # Plot fake testdata.
-        dates, values = self._get_fake_data(
-            identifier_list, start_date, end_date
-        )
         shape = WaterRegimeShape.objects.get(afdeling=identifier_list[0]['afdeling'])
         events_weighted_pmine,events_p,events_e = RegimeCalculator.weighted_precipitation_surplus(
         shape, start_date, end_date)
 
-        valuesP = [value * 1.2 for value in values]
-        valuesE = [value * 0.2 for value in values]
-
-        graph.axes.plot(events_weighted_pmine[:,0],events_weighted_pmine[:,1],'darkgreen', label='P - E', linewidth=2)
-        graph.axes.plot(events_p[:,0],events_p[:,1],color='gray', label='P')
-        graph.axes.plot(events_e[:,0],events_e[:,1],color='gray', label='E',linestyle='--')
+        graph.axes.plot(events_weighted_pmine[:,0],events_weighted_pmine[:,1],
+            'darkgreen', label='P - E', linewidth=2)
+        graph.axes.plot(events_p[:,0],events_p[:,1],
+            color='gray', label='P')
+        graph.axes.plot(events_e[:,0],events_e[:,1],
+            color='gray', label='E',linestyle='--')
 
         # Create an extra margin outside the data
         margin = 0.1 # Fraction of ylim padding outside data
@@ -350,22 +345,22 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
         if height is None:
             height = 170.0
 
-        dates, values = self._get_fake_data(
-            identifier_list, start_date, end_date
-        )
+        shape = WaterRegimeShape.objects.get(afdeling=identifier_list[0]['afdeling'])
+        events_weighted_pmine,events_p,events_e = RegimeCalculator.weighted_precipitation_surplus(
+        shape, start_date, end_date)
 
         graph = adapter.Graph(start_date, end_date, width, height)
         graph.add_today()
 
         # Make a nice broken_barh:
-        colors = [self._colorfunc(v) for v in values]
+        colors = [self._colorfunc(v) for v in events_weighted_pmine[:,1]]
         xranges = [(
-            date2num(date.replace(hour=2)),
-            20./24.
-        ) for date in dates]
+            date2num(datetime(dt.year,dt.month,dt.day,dt.hour)),
+            1./24
+        ) for dt in events_weighted_pmine[:,0]]
         yrange = (0.1,0.8)
 
-        graph.axes.broken_barh(xranges,yrange,facecolors=colors)
+        graph.axes.broken_barh(xranges,yrange,facecolors=colors,linewidth=0)
 
         # Legend building
         from matplotlib.patches import Rectangle
