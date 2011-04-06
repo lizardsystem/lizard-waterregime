@@ -1,10 +1,12 @@
 from lizard_waterregime.models import WaterRegimeShape
+from lizard_waterregime.models import Constant
 from lizard_waterregime.models import Regime
 from lizard_waterregime.models import Range
 from lizard_waterregime.models import Season
 from django.contrib import admin
 
 admin.site.register(WaterRegimeShape)
+admin.site.register(Constant)
 
 class RegimeAdmin(admin.ModelAdmin):
     def link(self,other):
