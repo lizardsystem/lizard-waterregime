@@ -231,7 +231,7 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
             template='lizard_waterregime/popup.html',
             extra_render_kwargs={
                 'graph_img_url': graph_img_url + afdeling,
-                'bar_img_url': bar_img_url,
+                'bar_img_url': bar_img_url + afdeling,
             }
         )        
             
