@@ -133,9 +133,10 @@ class TimeSeries(object):
     """
 
     def events(self, start=datetime.min, end=datetime.max, missing=None):
-        """ Returns all events between [start, end]. By default, any
-        missing values between the first and last event are replaced
-        by None. Magic values, e.g. -999.0, are not considered as
+        """ Returns all events between [start, end].
+        
+        By default, any missing values between the first and last event are
+        replaced by None. Magic values, e.g. -999.0, are not considered as
         missing - only datetimes that are completely absent.
         This might be better handled at the fews level?
 
@@ -246,6 +247,7 @@ class Constant(models.Model):
     value = models.FloatField()
     description = models.CharField(max_length=128, unique=True)
 
+
     @classmethod
     def get(cls, name):
         """ Returns the value of the constant or None if no constant
@@ -255,6 +257,10 @@ class Constant(models.Model):
             return cls.objects.get(name=name).value
         except Constant.DoesNotExist:
             return None
+
+
+    def __unicode__(self):
+        return self.name
 
 
 class Regime(models.Model):
@@ -305,4 +311,4 @@ class PrecipitationSurplus(models.Model):
     waterregimeshape = models.ForeignKey(WaterRegimeShape)
     date = models.DateTimeField(db_index = True)
     value = models.FloatField()
-
+    valid = models.CharField(max_length=1)
