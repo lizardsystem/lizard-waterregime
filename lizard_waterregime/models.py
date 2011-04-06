@@ -6,6 +6,8 @@
 from datetime import date
 from datetime import datetime
 from datetime import timedelta
+from django.contrib.contenttypes import generic
+from django.contrib.contenttypes.models import ContentType
 from django.contrib.gis.db import models
 from django.core.cache import cache
 from lizard_fewsunblobbed.models import Filter
@@ -112,7 +114,9 @@ class TimeSeriesFactory(models.Model):
     """ Factory class responsible for creating time series.
     """
     series_name = models.CharField(max_length=64, unique=True)
-    class_name = models.CharField(max_length=64)
+    content_type = models.ForeignKey(ContentType)
+    object_id = models.PositiveIntegerField()
+    content_object = generic.GenericForeignKey('content_type', 'object_id')
 
     @classmethod
     def get(cls, series_name):
@@ -120,8 +124,7 @@ class TimeSeriesFactory(models.Model):
         can remain ignorant to the concrete class and database used. For
         example: events = TimeSeriesFactory.get("P").events()
         """
-        class_name = cls.objects.get(series_name=series_name).class_name
-        return eval(class_name).objects.get(name=series_name)
+        return cls.objects.get(series_name=series_name).content_object
 
 
 class TimeSeries(object):
