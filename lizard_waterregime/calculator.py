@@ -63,19 +63,23 @@ class RegimeCalculator(object):
         e_dict = dict((event[0], event[1]) for event in e_series)
 
         for event in p_series:
+            
             dt = event[0]
             try:
                 e = e_dict[datetime(dt.year, dt.month, dt.day)]
             except KeyError:
                 e = cls.nearest(dt, e_series)
-            p_mapped.append(event)
-            e_mapped.append((dt, e))
+            # Carsten: note that bool(0) evaluates to false,
+            # days with zero e will drop out...
+            if e: 
+                p_mapped.append(event)
+                e_mapped.append((dt, e))
 
         return array(p_mapped), array(e_mapped)
 
     @classmethod
     def nearest(cls, dt, series):
-        return 0 #TODO
+        return None
 
     @classmethod
     def weights(cls, r, tmax):
@@ -87,92 +91,112 @@ class RegimeCalculator(object):
         
         a = concatenate((zeros(23),array([1]))).reshape(1,-1)
         b = normalized_factors.reshape(-1,1)
-        
-        result = (a * b).ravel()
-        
+        result = (a * b).ravel()[23:]
+
         return result
 
     @classmethod
     def weighted_precipitation_surplus(
-        cls, shape, date1, date2):
+        cls, shape, dt1, dt2):
         """Return all data tuple of weighted events weighted. Since daily
         values maybe required, everything is converted to daily."""
         
         tmax = int(Constant.get('Tmax'))
         r = abs(int(Constant.get('R_' + shape.afdeling)))
         
-        extra_time = timedelta(days = tmax, hours = 23, seconds = -1)       
-        internal_start = date1 - extra_time
+        # To calculate weighted p min e over past we need some past events
+        # as well, we need Tmax * 24 p values 
+        p_dt1 = dt1 - timedelta(days = tmax, seconds = -1)       
 
-        weights = cls.weights(r=r, tmax=tmax)
+        # however, for the map_events() to function properly, the e event at
+        # the beginning of the day of the first p event must be there as well.
+        e_dt1 = datetime(p_dt1.year, p_dt1.month, p_dt1.day)
         
         p_series = TimeSeriesFactory.get(timeseries_dict['P_' + shape.afdeling])
         e_series = TimeSeriesFactory.get(timeseries_dict['E_' + shape.afdeling])
             
-        p_events = tuple(p_series.events(internal_start, date2, missing=0))
-        eref_events = tuple(e_series.events(internal_start, date2, missing=0))
+        p_events = tuple(p_series.events(p_dt1, dt2, missing=0))
+        eref_events = tuple(e_series.events(e_dt1, dt2, missing=0))
         e_events = [(dt, v * shape.get_cropfactor(dt))
                         for dt, v in eref_events]  
         
         p_aligned, e_aligned = cls.map_events(p_events, e_events)
-        
-        p_daily_values = convolve(p_aligned[:,1],ones(24),'valid')
-        e_daily_values = e_aligned[23:,1]
-        dates =  p_aligned[23:,0]
 
-        p_weighted = convolve(p_daily_values,weights,'valid')
-        e_weighted = convolve(e_daily_values,weights,'valid')
-        dates_weighted = dates[weights.size - 1:]
+        # p values are for the past hour, e values for the past day.
+        # Therefore p has to be accumulated, and the length of e has to
+        # be adjusted accordingly. But only do this if p is at least 24 long,
+        # else return empty lists.
+        if p_aligned.shape[0] >= 24:
+            p_daily_values = convolve(p_aligned[:,1],ones(24),'valid')
+            e_daily_values = e_aligned[23:,1]
+            daily_dates =  p_aligned[23:,0]
+        else:
+            p_daily_values = array([])
+            e_daily_values = array([])
+            daily_dates =  array([])
+            
+        # Only do the weighting if p_daily_values is long enough for the
+        # weights, so that at least one value as returned.
+        weights = cls.weights(r=r, tmax=tmax)
+        if p_daily_values.shape[0] >= weights.size:
+            p_weighted = convolve(p_daily_values,weights,'valid')
+            e_weighted = convolve(e_daily_values,weights,'valid')
+            dates_weighted = daily_dates[weights.size - 1:]
+        else:
+            p_weighted = array([])
+            e_weighted = array([])
+            dates_weighted = array([])
 
         pmine_weighted = p_weighted - e_weighted
 
-        #print concatenate(([dates],[p_daily_values])).transpose()
-        
+        print p_daily_values.size
+        print e_daily_values.size
+        print weights.size
         return (
             _to_events(dates_weighted,pmine_weighted),
-            _to_events(dates,p_daily_values),
-            array(e_events),
+            array(p_events),
+            array(e_events)
         )
 
     
     @classmethod
     def refresh(cls,dt):
-        """ Check and if necessary insert precipitationsurplus values in
-        database for datetime.
+        """Insert PrecipitationSurplus values in database.
         
+        All PrecipitationSurplus objects in de database are deleted.
         To be called from the waterregime adapter."""
-
-        qs = PrecipitationSurplus.objects.filter(date=_first_of_hour(dt))       
-        # if PrecipitationSurplus.objects.filter(date=_first_of_hour(dt)).exists():
-        if bool(qs):
-            for obj in qs:
-                obj.delete()
-        # return False
-
+        for obj in PrecipitationSurplus.objects.all():
+            obj.delete()
 
         shapes = WaterRegimeShape.objects.all()
 
+        valid_values = 0
         for s in shapes:
             pmine,p,e = cls.weighted_precipitation_surplus(
-                s, dt, dt)
+                shape = s, dt1 = dt, dt2 = dt
+            )
+
+            if pmine.shape[0] == 1:
+                value = pmine[0,1]
+                valid = 'Y'
+                valid_values += 1
+            else:
+                value = 0
+                valid = 'N'
             p = PrecipitationSurplus(
                 waterregimeshape=s,
                 date=_first_of_hour(dt),
-                value=pmine[0][1],
+                value=value,
+                valid=valid
             )
             p.save()
 
-        return True
+        return valid_values
 
 
     @classmethod
     def test(cls):
-        a,b,c = cls.weighted_precipitation_surplus(
-            WaterRegimeShape.objects.all()[0],
-            datetime.now(),
-            datetime.now()
-        )
-        print a
-        print b
-        print c
-
+        #a,b,c = cls.weighted_precipitation_surplus(
+        #    WaterRegimeShape.objects.all()[0], datetime.now(),datetime.now()+timedelta(5))
+        cls.refresh(datetime(2011,3,29))
+        
