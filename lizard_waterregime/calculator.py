@@ -139,8 +139,8 @@ class RegimeCalculator(object):
         # weights, so that at least one value as returned.
         weights = cls.weights(r=r, tmax=tmax)
         if p_daily_values.shape[0] >= weights.size:
-            p_weighted = convolve(p_daily_values,weights,'valid')
-            e_weighted = convolve(e_daily_values,weights,'valid')
+            p_weighted = convolve(p_daily_values, weights, 'valid')
+            e_weighted = convolve(e_daily_values, weights, 'valid')
             dates_weighted = daily_dates[weights.size - 1:]
         else:
             p_weighted = array([])
@@ -149,9 +149,6 @@ class RegimeCalculator(object):
 
         pmine_weighted = p_weighted - e_weighted
 
-        print p_daily_values.size
-        print e_daily_values.size
-        print weights.size
         return (
             _to_events(dates_weighted,pmine_weighted),
             array(p_events),
