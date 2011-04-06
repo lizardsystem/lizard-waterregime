@@ -113,9 +113,12 @@ def workspace_item_bar_image(request, workspace_item_id):
 
     identifier_list
     """
-    identifier_json_list = request.GET.getlist('identifier')
-    identifier_list = [json.loads(identifier_json) for identifier_json in
-                       identifier_json_list]
+
+#    identifier_json_list = request.GET.getlist('identifier')
+#    identifier_list = [json.loads(identifier_json) for identifier_json in
+#                       identifier_json_list]
+                       
+    identifier_list = [{'afdeling': request.GET.get('afdeling'),}]
 
     width = request.GET.get('width')
     height = request.GET.get('height')
