@@ -290,6 +290,11 @@ class Constant(models.Model):
     def __unicode__(self):
         return self.name
 
+    class Meta:
+        verbose_name = "Constante"
+        verbose_name_plural = "Constanten"
+
+
 
 class Regime(models.Model):
     name = models.CharField(max_length=16)
@@ -323,6 +328,8 @@ class Season(models.Model):
 
     class Meta:
         ordering = ['month_from','day_from']
+        verbose_name = "Seizoen"
+        verbose_name_plural = "Seizoenen"
 
 class Range(models.Model):
     regime = models.ForeignKey(Regime)
@@ -334,6 +341,12 @@ class Range(models.Model):
     upper_limit = models.DecimalField(
         max_digits = 4, decimal_places = 1, null = True, blank = True
     )
+    
+
+    class Meta:
+        verbose_name = "Grenswaarde"
+        verbose_name_plural = "Grenswaarden"
+    
 
 class PrecipitationSurplus(models.Model):
     waterregimeshape = models.ForeignKey(WaterRegimeShape)
