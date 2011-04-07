@@ -17,10 +17,11 @@ from lizard_map.coordinates import RD
 from lizard_map.workspace import WorkspaceItemAdapter
 from lizard_map.symbol_manager import SymbolManager
 
-from lizard_waterregime.models import WaterRegimeShape
+from lizard_waterregime.models import PrecipitationSurplus
 from lizard_waterregime.models import Regime
-from lizard_waterregime.models import Season
 from lizard_waterregime.calculator import RegimeCalculator
+from lizard_waterregime.models import Season
+from lizard_waterregime.models import WaterRegimeShape
 
 from numpy import isnan
 
@@ -103,7 +104,9 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
 
         db_settings = settings.DATABASES['default']
 
-        # refresh the p min e values in the database if necessary
+        # Refresh the p min e values in the database if necessary.
+        # Tricky in a multi-user environment: between creating
+        # and reading, other users can touch the table...
         RegimeCalculator.refresh(self.regimedatetime)
         shape_view = str("""(
             select
@@ -504,14 +507,18 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
         return legend_result
 
     def values(self, identifier_list, start_date, end_date):
-        """ Return values in list of dictionaries (datetime, value, unit)
+        """ Return weighted P - E values in list of
+        dictionaries (datetime, value, unit)
         """
-        dates,values = self.get_fake_data(
-            identifier_list, start_date, end_date
-        )
-        return [{
-                'datetime':date,
-                'value':value,
-                'unit':None
-            } for date,value in zip(dates,values) ]
-        
+        afdeling = identifier_list['afdeling']
+        shape = WaterRegimeShape.objects.get(afdeling=afdeling) 
+        w, p, e = RegimeCalculator.weighted_precipitation_surplus(
+            shape, start_date, end_date)
+        return [
+            {
+            'datetime': date,
+            'value': value,
+            'unit': 'mm/dag',
+            } for date, value in w
+        ]
+
