@@ -174,10 +174,9 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
                 precipitationsurplus = '%1.1f mm/dag' % value
             else:                
                 precipitationsurplus = 'Onbekend'
-            popup_string = ('Gewogen P-E: %s (%s) op <br />%s' % (
+            popup_string = ('Gewogen P-E: %s (%s)' % (
                     precipitationsurplus,
-                    afdeling[:2]+'-'+afdeling[2:],
-                    self.regimedatetime
+                    afdeling[:2]+'-'+afdeling[2:]
             ))
             identifier = {
                 'afdeling': afdeling,
