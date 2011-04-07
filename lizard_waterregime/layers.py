@@ -22,6 +22,8 @@ from lizard_waterregime.models import Regime
 from lizard_waterregime.models import Season
 from lizard_waterregime.calculator import RegimeCalculator
 
+from numpy import isnan
+
 logger = logging.getLogger('nens.waterregimeadapter')
 
 
@@ -421,11 +423,12 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
         start = datetime.now()
 
         logger.debug(events_weighted_pmine)
-        colors = [cf.colorfunc(dt,v) for dt,v in events_weighted_pmine]
+        colors = [cf.colorfunc(dt,v) for dt,v in filter(
+            lambda x: not isnan(x[1]),events_weighted_pmine)]
         xranges = [(
             date2num(datetime(dt.year,dt.month,dt.day,dt.hour)),
             1./24
-        ) for dt in events_weighted_pmine[:,0]]
+        ) for dt,v in filter(lambda x: not isnan(x[1]),events_weighted_pmine)]
         yrange = (0.1,0.8)
 
         logger.debug(datetime.now() - start)
