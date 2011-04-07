@@ -3,7 +3,8 @@
 # Create your views here.
 
 #import datetime
-#import logging
+import logging
+logger = logging.getLogger(__name__)
 #import time
 
 from django.core.urlresolvers import reverse
@@ -75,14 +76,14 @@ def start(request,
         
 def workspace_item_graph_image(request, workspace_item_id):
     """Shows image corresponding to workspace item and location identifier(s)
-
+    only works with regime adapter
     identifier_list
     """
     
 #    identifier_json_list = request.GET.getlist('identifier')
 #    identifier_list = [json.loads(identifier_json) for identifier_json in
 #                       identifier_json_list]
-                       
+    
     identifier_list = [{'afdeling': request.GET.get('afdeling'),}]
 
     width = request.GET.get('width')
