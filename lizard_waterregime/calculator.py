@@ -14,7 +14,6 @@ from numpy import convolve
 from numpy import interp
 from numpy import NaN
 from numpy import ones
-from numpy import vstack
 from numpy import zeros
 
 import logging
@@ -32,8 +31,7 @@ def  _split_events(events):
     """Return a (dates, values) tuple of arrays."""
     return events[:,0],events[:,1]
 
-
-# This *could* also be in the database. It relates timeseries.
+# This *should* also be in the database. It relates timeseries.
 timeseries_dict = {
         'E_HAZOF' : 'E_LELYSTAD',
         'E_LAZOF' : 'E_LELYSTAD',
@@ -46,6 +44,7 @@ timeseries_dict = {
         'P_LANOP' : 'P_LANOP',
         'P_TANOP' : 'P_TANOP',
 }
+
 
 class RegimeCalculator(object):
     """ Calculation methods for the waterregime djangoapp.
@@ -188,20 +187,19 @@ class RegimeCalculator(object):
 
     
     @classmethod
-    def refresh(cls,dt):
+    def refresh(cls, dt):
         """Insert PrecipitationSurplus values in database.
         
         All PrecipitationSurplus objects in de database are deleted.
         To be called from the waterregime adapter."""
-        for obj in PrecipitationSurplus.objects.all():
-            obj.delete()
 
+        PrecipitationSurplus.objects.all().delete()
         shapes = WaterRegimeShape.objects.all()
 
         valid_values = 0
         for s in shapes:
-            pmine,p,e = cls.weighted_precipitation_surplus(
-                shape = s, dt1 = dt, dt2 = dt
+            pmine, p, e = cls.weighted_precipitation_surplus(
+                shape=s, dt1=dt, dt2=dt
             )
             if pmine.shape == (1,2) and not pmine[0,1] == NaN:
                 value = pmine[0,1]
