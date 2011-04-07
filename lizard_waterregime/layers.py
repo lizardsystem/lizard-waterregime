@@ -335,14 +335,17 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
         if events_e.size > 0:
             graph.axes.plot(events_e[:,0],events_e[:,1],
                 color='red', label='E (mm/dag)',linestyle='',marker='o')
+#        if events_p.size > 0:
+#            graph.axes.plot(events_p[:,0],events_p[:,1],
+#                color='blue', label='P (mm/uur)',linestyle='-',marker='.')
         if events_p.size > 0:
-            graph.axes.plot(events_p[:,0],events_p[:,1],
-                color='blue', label='P (mm/uur)',linestyle='-',marker='.')
+            graph.axes.bar(events_p[:,0],events_p[:,1],1./24,edgecolor='blue',
+                color='blue', label='P (mm/uur)')
         if events_weighted_pmine.size > 0:
             graph.axes.plot(
                 events_weighted_pmine[:,0],
                 events_weighted_pmine[:,1],
-                'darkgreen', label='P - E (mm/dag)',linestyle='',marker='.')
+                'darkgreen', label='P - E (mm/dag)',linestyle='-',marker='.')
         
 
         # Create an extra margin outside the data
