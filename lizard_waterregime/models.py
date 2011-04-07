@@ -50,6 +50,13 @@ class WaterRegimeShape(models.Model):
 
         return factor
 
+    def __unicode__(self):
+        return self.naam
+
+    class Meta:
+       verbose_name = "Peilgebied"
+       verbose_name_plural = "Peilgebieden"
+
 
 class LandCover(models.Model):
     """ Land cover is the physical material or vegetation at the surface
@@ -77,6 +84,13 @@ class LandCover(models.Model):
 
         return value[self.pk]
 
+    def __unicode__(self):
+        return self.name
+
+    class Meta:
+        verbose_name = "Landbedekking"
+        verbose_name_plural = "Landbedekking"
+
 
 class LandCoverData(models.Model):
     """ Each geographical region can be characterized according to its
@@ -88,9 +102,13 @@ class LandCoverData(models.Model):
     cover = models.ForeignKey(LandCover)
     fraction = models.FloatField()
 
+    def __unicode__(self):
+        return "%s in %s" % (self.cover.name, self.region.naam)
+
     class Meta:
         unique_together = (("region", "cover"),)
-
+        verbose_name = "Landgebruik"
+        verbose_name_plural = "Landgebruik"
 
 class CropFactor(models.Model):
     """ Factor to correct the evaporation of a reference area for a
@@ -106,8 +124,13 @@ class CropFactor(models.Model):
     day = models.SmallIntegerField()
     factor = models.FloatField()
 
+    def __unicode__(self):
+        return self.crop.name
+
     class Meta:
         unique_together = (("crop", "month", "day"),)
+        verbose_name = "Gewasfactor"
+        verbose_name_plural = "Gewasfactoren"
 
 
 class TimeSeriesFactory(models.Model):
@@ -234,9 +257,14 @@ class FewsTimeSeries(models.Model, TimeSeries):
             filter(tsd_time__range=(start, end)).order_by('tsd_time'):
             yield event.tsd_time, event.tsd_value
 
+    def __unicode__(self):
+        return self.name
+
     class Meta:
         unique_together = (("moduleinstanceid", "timestep",
             "fid", "lid", "pid"),)
+        verbose_name = "Tijdreeks"
+        verbose_name_plural = "Tijdreeksen"
 
 
 class Constant(models.Model):
