@@ -14,20 +14,23 @@ the default template for the html_default method.
   <strong>{{ title|truncatewords:8 }}</strong>
 </div>
 -->
+{% for regime_graphs in graphs %}
+<h3>{{ regime_graphs.afdeling }}</h3>
 <div style="width: 100%; height: 170px;"
      class="img-use-my-size">
-  <a href="{{ graph_img_url }}"
+  <a href="{{ regime_graphs.graph_img_url }}"
      class="replace-with-image">
     afbeelding nog niet geladen
   </a>
 </div>
 <div style="width: 100%; height: 130px;"
      class="img-use-my-size">
-  <a href="{{ bar_img_url }}"
+  <a href="{{ regime_graphs.bar_img_url }}"
      class="replace-with-image">
     afbeelding nog niet geladen
   </a>
 </div>
+{% endfor %}
 <br />
 <table class="noprint generic-table">
   <thead>
