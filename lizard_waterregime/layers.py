@@ -24,11 +24,6 @@ from lizard_waterregime.calculator import RegimeCalculator
 
 logger = logging.getLogger('nens.waterregimeadapter')
 
-class SeasonError(Exception):
-    def __init__(self, value):
-        self.value = value
-    def __str__(self):
-        return repr(self.value)
 
 class AdapterWaterRegime(WorkspaceItemAdapter):
     """Adapter for module lizard_waterregime.
@@ -39,25 +34,12 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
     on the map are shown. """
 
     regimedatetime = datetime.now()
-    regimedatetime = datetime(2011,3,28)
 
-    def _season(self):
-        """Return a Season object."""
-
-        seasons = Season.objects.filter(
-            month_from__lte=self.regimedatetime.month,
-            month_to__gte=self.regimedatetime.month,
-            day_from__lte=self.regimedatetime.day,
-            day_to__gte=self.regimedatetime.day,
-        )
-        if len(seasons) > 1:
-            raise SeasonError('Overlapping seasons in the database')
-        else:        
-            return seasons[0]
 
     def _mapnik_style(self, season):
         """ Return a mapnik_style, accounting for season """
         
+
         def _filters(season):
         
             """Generate mapnikfilters and colors for the ranges in this
@@ -82,7 +64,6 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
                 # Extra filter for invalid pmine's
                 filters.append("[valid] = 'N'")
                 colors.append((127,0,127,63))
-
 
             return zip(colors,filters)
 
@@ -151,7 +132,8 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
 
         layer.styles.append(style_name)
         layers.append(layer)
-        mapnik_style = self._mapnik_style(self._season())
+        cf = self.Colorfunc()        
+        mapnik_style = self._mapnik_style(cf.season(self.regimedatetime))
         styles[style_name] = mapnik_style
 
         return layers, styles
@@ -221,6 +203,10 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
                          'editing': False}
         """
 
+        if snippet_group is not None:
+            snippets = snippet_group.snippets.all()
+            identifiers = [snippet.identifier for snippet in snippets]
+            
         graph_img_url = reverse(
             "lizard_waterregime.workspace_item_graph_image",
             kwargs={'workspace_item_id': self.workspace_item.id},
@@ -229,15 +215,23 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
             "lizard_waterregime.workspace_item_bar_image",
             kwargs={'workspace_item_id': self.workspace_item.id},
             )
-        afdeling = "?afdeling=" + identifiers[0]['afdeling']
+        graphs = []
+        for identifier in identifiers:
+            afdeling = "?afdeling=" + identifier['afdeling']
+            graphs.append({
+                'afdeling': identifier['afdeling'],
+                'graph_img_url': graph_img_url + afdeling,
+                'bar_img_url': bar_img_url + afdeling
+                })
         return super(AdapterWaterRegime, self).html_default(
             snippet_group=snippet_group,
             identifiers=identifiers,
             layout_options=layout_options,
             template='lizard_waterregime/popup.html',
             extra_render_kwargs={
-                'graph_img_url': graph_img_url + afdeling,
-                'bar_img_url': bar_img_url + afdeling,
+                'graphs': graphs,
+                #'graph_img_url': graph_img_url + afdeling,
+                #'bar_img_url': bar_img_url + afdeling,
             }
         )        
             
@@ -262,34 +256,58 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
             'identifier': identifier,
             }
 
-    def _colorfunc(self,value):
-        """Return rgba_color corresponding to value."""
-        
-        # We're going to cache the regimeranges
-        regimeranges = cache.get('regimeranges')
-        if not regimeranges:
-            regimeranges = self._season().range_set.all()
-            cache.set('regimeranges',regimeranges)
 
-        for r in regimeranges:
-            # only valid range if at least one limit is set
-            if r.upper_limit or r.lower_limit:
+    class Colorfunc(object):
+        """ Class with colorfunction method."""
+        def __init__(self):
+            self.seasons = Season.objects.all()
+            self.regimeranges = {}
+            for s in self.seasons:
+                self.regimeranges[s] = s.range_set.all()
                 
+        def season(self, dt):
+            for s in self.seasons:
                 if (
-                    r.lower_limit == None or
-                    value >= float(r.lower_limit)
-                   ) and (
-                    r.upper_limit == None or
-                    value < float(r.upper_limit)
-                   ):
-                    color = r.regime.color_rgba() 
-                    return color
+                    (
+                        dt.month > s.month_from and
+                        dt.month < s.month_to
+                    ) or (
+                        dt.month == s.month_from and
+                        dt.day >= s.day_from
+                    ) or (
+                     dt.month == s.month_to and
+                     dt.day <= s.day_to
+                    ) 
+                ):
+                    return s
+                
+                    
+        def colorfunc(self, datetime, value):
+            """ Return the colorfunction corresponding to value and datetime."""
+            for r in self.regimeranges[self.season(datetime)]:
+            # only valid range if at least one limit is set
+                if r.upper_limit or r.lower_limit:
+                    if (
+                        r.lower_limit == None or
+                        value >= float(r.lower_limit)
+                       ) and (
+                        r.upper_limit == None or
+                        value < float(r.upper_limit)
+                       ):
+                        color = r.regime.color_rgba() 
+                        return color
 
-        return (0,1,0,0)
+            # if no rule applied, get this ugly green color.
+            return (0,1,0,0)
+
 
     def graph_image(self, identifier_list,start_date, end_date,
                     width=None, height=None, layout_extra=None):
-        """Visualize scores or measures in a graph each row is an area."""
+        """Visualize scores or measures in a graph each row is an area.
+        
+        Not suitable for collages presently, since the 'afdeling' is passed
+        via the image url.
+        """
         
         if width is None:
             width = 380.0
@@ -303,6 +321,8 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
             afdeling=identifier_list[0]['afdeling']
         )
         
+        now = datetime.now()
+        
         events_weighted_pmine,events_p,events_e = (
             RegimeCalculator.weighted_precipitation_surplus(
                 shape,
@@ -310,18 +330,19 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
                 datetime(end_date.year, end_date.month, end_date.day)
             )
         )
-
+        
+        if events_e.size > 0:
+            graph.axes.plot(events_e[:,0],events_e[:,1],
+                color='red', label='E (mm/dag)',linestyle='',marker='o')
+        if events_p.size > 0:
+            graph.axes.plot(events_p[:,0],events_p[:,1],
+                color='blue', label='P (mm/uur)',linestyle='-',marker='.')
         if events_weighted_pmine.size > 0:
             graph.axes.plot(
                 events_weighted_pmine[:,0],
                 events_weighted_pmine[:,1],
-                'darkgreen', label='P - E (mm/dag)', linewidth=2)
-        if events_p.size > 0:
-            graph.axes.plot(events_p[:,0],events_p[:,1],
-                color='blue', label='P (mm/uur)',linestyle='-',marker='.')
-        if events_e.size > 0:
-            graph.axes.plot(events_e[:,0],events_e[:,1],
-                color='red', label='E (mm/dag)',linestyle='',marker='o')
+                'darkgreen', label='P - E (mm/dag)',linestyle='',marker='.')
+        
 
         # Create an extra margin outside the data
         margin = 0.1 # Fraction of ylim padding outside data
@@ -351,7 +372,9 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
         
         # Labeling and legend position
         #graph.axes.set_ylabel('Neerslagoverschot (mm/dag)')
-        graph.axes.legend(loc=3)
+        graph.legend_on_bottom_height = 0.15
+        graph.axes.legend(bbox_to_anchor=(0., -0.3, 1., 1.),
+        loc=3,ncol=4,mode="expand", borderaxespad=0.)   
 
         response = graph.http_png()
         response['Cache-Control'] = 'max-age=15' 
@@ -360,7 +383,11 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
 
     def bar_image(self, identifier_list, start_date, end_date,
         width=None, height=None, layout_extra=None):
-        """Return a colored bar representing the regime against the time."""
+        """Return a colored bar representing the regime against the time.
+        
+        Not suitable for collages presently, since the 'afdeling' is passed
+        via the image url.
+        """
         
         if width is None:
             width = 380.0
@@ -371,6 +398,8 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
             afdeling=identifier_list[0]['afdeling']
         )
         
+        start = datetime.now()
+        
         events_weighted_pmine,events_p,events_e = (
             RegimeCalculator.weighted_precipitation_surplus(
                 shape,
@@ -379,20 +408,35 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
             )
         )
 
+        logger.debug(datetime.now() - start)
+        start = datetime.now()
+
         graph = adapter.Graph(start_date, end_date, width, height)
         graph.add_today()
 
         # Make a nice broken_barh:
-        colors = [self._colorfunc(v) for v in events_weighted_pmine[:,1]]
+        cf = self.Colorfunc()
+        
+        logger.debug(datetime.now() - start)
+        start = datetime.now()
+
+        logger.debug(events_weighted_pmine)
+        colors = [cf.colorfunc(dt,v) for dt,v in events_weighted_pmine]
         xranges = [(
             date2num(datetime(dt.year,dt.month,dt.day,dt.hour)),
             1./24
         ) for dt in events_weighted_pmine[:,0]]
         yrange = (0.1,0.8)
 
+        logger.debug(datetime.now() - start)
+        start = datetime.now()
+
         graph.axes.broken_barh(xranges,yrange,facecolors=colors,linewidth=0,
         antialiased=False,
         )
+
+        logger.debug(datetime.now() - start)
+        start = datetime.now()
 
         # Legend building
         from matplotlib.patches import Rectangle
