@@ -7,12 +7,11 @@ from datetime import datetime
 from datetime import timedelta
 
 from numpy import abs
+from numpy import NaN
 from numpy import arange
 from numpy import array
 from numpy import concatenate
 from numpy import convolve
-from numpy import interp
-from numpy import NaN
 from numpy import ones
 from numpy import vstack
 from numpy import zeros
@@ -20,13 +19,16 @@ from numpy import zeros
 import logging
 logger = logging.getLogger('nens.calculator')
 
+
 def _first_of_hour(dt):
     """Return the first moment of the hour for a datetime."""
     return datetime(dt.year, dt.month, dt.day, dt.hour)
+
     
 def _to_events(dates, values):
     """Return an array of date,value pairs."""
     return concatenate(([dates],[values])).transpose()
+
 
 def  _split_events(events):
     """Return a (dates, values) tuple of arrays."""
@@ -47,6 +49,7 @@ timeseries_dict = {
         'P_TANOP' : 'P_TANOP',
 }
 
+
 class RegimeCalculator(object):
     """ Calculation methods for the waterregime djangoapp.
     
@@ -60,64 +63,59 @@ class RegimeCalculator(object):
         """
         """
 
+        p_mapped = []
         e_mapped = []
         e_dict = dict((event[0], event[1]) for event in e_series)
 
         for event in p_series:
-
+            
             dt = event[0]
-
             try:
-                dt_before = datetime(dt.year, dt.month, dt.day)
-                e_before = float(e_dict[dt_before])
-            except:
-                e_before = None
+                e = e_dict[datetime(dt.year, dt.month, dt.day)]
+            except KeyError:
+                e = cls.nearest(dt, e_series)
+            # Carsten: note that bool(0) evaluates to false,
+            # days with zero e will drop out...
+            if e: 
+                p_mapped.append(event)
+                e_mapped.append((dt, e))
 
-            try:
-                dt_after = dt_before + timedelta(days=1)
-                e_after = float(e_dict[dt_after])
-            except:
-                e_after = None
+        return array(p_mapped), array(e_mapped)
 
-            if e_before is not None and e_after is not None:
-                delta = dt - dt_before
-                e_dt = interp(delta.seconds, (0, 86400), (e_before, e_after))
-            elif e_before is not None:
-                e_dt = e_before
-            elif e_after is not None:
-                e_dt = e_after
-            else:
-                e_dt = cls.nearest(dt, e_series)
-
-            e_mapped.append((dt, e_dt))
-
-        return array(p_series), array(e_mapped)
 
     @classmethod
     def nearest(cls, dt, series):
-        """
-        """
-        return NaN
+        return None
+
 
     @classmethod
     def weights(cls, r, tmax):
         """Return an array of weightfactors"""
         
-        days = arange(-tmax + 1.,1)
+        # Start with an array of days [0, -1, ..., -tmax]
+        days = arange(0., -tmax, -1)
         factors = 1 / abs(days - r)
         normalized_factors = factors / sum(factors)
         
-        a = concatenate((zeros(23),array([1]))).reshape(1,-1)
+        # Use numpy functions to insert 23 zeros between every factor
+        a = concatenate((array([1]),zeros(23))).reshape(1,-1)
         b = normalized_factors.reshape(-1,1)
-        result = (a * b).ravel()[23:]
+        result = (a * b).ravel()[:-23]
 
         return result
 
     @classmethod
     def weighted_precipitation_surplus(
         cls, shape, dt1, dt2):
-        """Return all data tuple of weighted events weighted. Since daily
-        values maybe required, everything is converted to daily."""
+        """Return all-data-tuple with resulting and source data.
+        
+        Returned data tuple contains three arrays of events:
+        - calculated p minus e events
+        - original p events
+        - original e events
+        
+        If dt1 == dt2 and all data is present, exactly one calculated event
+        is returned."""
         
         tmax = int(Constant.get('Tmax'))
         r = abs(int(Constant.get('R_' + shape.afdeling)))
@@ -130,14 +128,18 @@ class RegimeCalculator(object):
         # the beginning of the day of the first p event must be there as well.
         e_dt1 = datetime(p_dt1.year, p_dt1.month, p_dt1.day)
         
+
+        # Get the relevant timeseries
         p_series = TimeSeriesFactory.get(timeseries_dict['P_' + shape.afdeling])
         e_series = TimeSeriesFactory.get(timeseries_dict['E_' + shape.afdeling])
             
-        p_events = tuple(p_series.events(p_dt1, dt2, missing=0))
-        eref_events = tuple(e_series.events(e_dt1, dt2, missing=0))
-        e_events = [(dt, v * shape.get_cropfactor(dt))
+        # Get the events from the period of interest
+        p_events = tuple(p_series.events(p_dt1, dt2, missing=NaN))
+        eref_events = tuple(e_series.events(e_dt1, dt2, missing=NaN))
+        e_events = [[dt, v * shape.get_cropfactor(dt)]
                         for dt, v in eref_events]  
-        
+
+        # Make sure there is an e_event for every p_event
         p_aligned, e_aligned = cls.map_events(p_events, e_events)
 
         # p values are for the past hour, e values for the past day.
@@ -184,14 +186,12 @@ class RegimeCalculator(object):
             obj.delete()
 
         shapes = WaterRegimeShape.objects.all()
-
         valid_values = 0
         for s in shapes:
             pmine,p,e = cls.weighted_precipitation_surplus(
                 shape = s, dt1 = dt, dt2 = dt
             )
-
-            if pmine.shape[0] == 1:
+            if pmine.shape == (1,2) and not pmine[0,1] == NaN:
                 value = pmine[0,1]
                 valid = 'Y'
                 valid_values += 1
