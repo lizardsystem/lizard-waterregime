@@ -7,11 +7,12 @@ from datetime import datetime
 from datetime import timedelta
 
 from numpy import abs
-from numpy import NaN
 from numpy import arange
 from numpy import array
 from numpy import concatenate
 from numpy import convolve
+from numpy import interp
+from numpy import NaN
 from numpy import ones
 from numpy import vstack
 from numpy import zeros
@@ -19,16 +20,13 @@ from numpy import zeros
 import logging
 logger = logging.getLogger('nens.calculator')
 
-
 def _first_of_hour(dt):
     """Return the first moment of the hour for a datetime."""
     return datetime(dt.year, dt.month, dt.day, dt.hour)
-
     
 def _to_events(dates, values):
     """Return an array of date,value pairs."""
     return concatenate(([dates],[values])).transpose()
-
 
 def  _split_events(events):
     """Return a (dates, values) tuple of arrays."""
@@ -49,7 +47,6 @@ timeseries_dict = {
         'P_TANOP' : 'P_TANOP',
 }
 
-
 class RegimeCalculator(object):
     """ Calculation methods for the waterregime djangoapp.
     
@@ -63,30 +60,44 @@ class RegimeCalculator(object):
         """
         """
 
-        p_mapped = []
         e_mapped = []
         e_dict = dict((event[0], event[1]) for event in e_series)
 
         for event in p_series:
-            
+
             dt = event[0]
+
             try:
-                e = e_dict[datetime(dt.year, dt.month, dt.day)]
-            except KeyError:
-                e = cls.nearest(dt, e_series)
-            # Carsten: note that bool(0) evaluates to false,
-            # days with zero e will drop out...
-            if e: 
-                p_mapped.append(event)
-                e_mapped.append((dt, e))
+                dt_before = datetime(dt.year, dt.month, dt.day)
+                e_before = float(e_dict[dt_before])
+            except:
+                e_before = None
 
-        return array(p_mapped), array(e_mapped)
+            try:
+                dt_after = dt_before + timedelta(days=1)
+                e_after = float(e_dict[dt_after])
+            except:
+                e_after = None
 
+            if e_before is not None and e_after is not None:
+                delta = dt - dt_before
+                e_dt = interp(delta.seconds, (0, 86400), (e_before, e_after))
+            elif e_before is not None:
+                e_dt = e_before
+            elif e_after is not None:
+                e_dt = e_after
+            else:
+                e_dt = cls.nearest(dt, e_series)
+
+            e_mapped.append((dt, e_dt))
+
+        return array(p_series), array(e_mapped)
 
     @classmethod
     def nearest(cls, dt, series):
-        return None
-
+        """
+        """
+        return NaN
 
     @classmethod
     def weights(cls, r, tmax):
@@ -186,6 +197,7 @@ class RegimeCalculator(object):
             obj.delete()
 
         shapes = WaterRegimeShape.objects.all()
+
         valid_values = 0
         for s in shapes:
             pmine,p,e = cls.weighted_precipitation_surplus(
