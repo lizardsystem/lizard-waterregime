@@ -2,12 +2,9 @@ import logging
 import mapnik
 import os
 from datetime import datetime
-from datetime import timedelta
 from matplotlib.dates import date2num
-from matplotlib.dates import num2date
 
 from django.core.urlresolvers import reverse
-from django.core.cache import cache
 from django.conf import settings
 
 from lizard_map import coordinates
@@ -17,7 +14,6 @@ from lizard_map.coordinates import RD
 from lizard_map.workspace import WorkspaceItemAdapter
 from lizard_map.symbol_manager import SymbolManager
 
-from lizard_waterregime.models import PrecipitationSurplus
 from lizard_waterregime.models import Regime
 from lizard_waterregime.calculator import RegimeCalculator
 from lizard_waterregime.models import Season
@@ -38,13 +34,11 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
 
     regimedatetime = datetime.now()
 
-
     def _mapnik_style(self, season):
         """ Return a mapnik_style, accounting for season """
-        
 
         def _filters(season):
-        
+
             """Generate mapnikfilters and colors for the ranges in this
             season."""
             colors = []
@@ -66,14 +60,13 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
 
                 # Extra filter for invalid pmine's
                 filters.append("[valid] = 'N'")
-                colors.append((127,0,127,63))
+                colors.append((127, 0, 127, 63))
 
-            return zip(colors,filters)
+            return zip(colors, filters)
 
-            
         def _mapnik_rule(color, mapnik_filter):
             """ Return a mapnik_rule
-            
+
             Here also the line thickness and fill opacity can be set."""
             rule = mapnik.Rule()
 
@@ -87,18 +80,16 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
             symb_poly.fill_opacity = .8
             rule.symbols.append(symb_poly)
             return rule
-        
 
         mapnik_style = mapnik.Style()
         mapnik_style.rules.extend(
-            [_mapnik_rule(*args) for args in _filters(season)]
-        )
+            [_mapnik_rule(*args) for args in _filters(season)])
         return mapnik_style
 
     def layer(self, layer_ids=None, request=None):
         """Generates and returns mapnik layers and styles.
         """
-        
+
         layers = []
         styles = {}
 
@@ -126,23 +117,22 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
         # RD = rijksdriehoek. Somehow 'Google' is also mentioned originally?
         layer.srs = RD
         layer.datasource = mapnik.PostGIS(
-            host = db_settings['HOST'],
-            user = db_settings['USER'],
-            password = db_settings['PASSWORD'],
-            dbname = db_settings['NAME'],
-            table = shape_view
-        )
+            host=db_settings['HOST'],
+            user=db_settings['USER'],
+            password=db_settings['PASSWORD'],
+            dbname=db_settings['NAME'],
+            table=shape_view)
 
         style_name = 'waterregime_style'
 
         layer.styles.append(style_name)
         layers.append(layer)
-        cf = self.Colorfunc()        
+        cf = self.Colorfunc()
         mapnik_style = self._mapnik_style(cf.season(self.regimedatetime))
         styles[style_name] = mapnik_style
 
         return layers, styles
-        
+
     def search(self, google_x, google_y, radius=None):
         """Search by coordinates, return matching items as list of dicts
 
@@ -175,12 +165,11 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
             value = feature.properties['value']
             if valid == 'Y':
                 precipitationsurplus = '%1.1f mm/dag' % value
-            else:                
+            else:
                 precipitationsurplus = 'Onbekend'
             popup_string = ('Gewogen P-E: %s (%s)' % (
                     precipitationsurplus,
-                    afdeling[:2]+'-'+afdeling[2:]
-            ))
+                    afdeling[:2] + '-' + afdeling[2:]))
             identifier = {
                 'afdeling': afdeling,
                 'google_x': google_x,
@@ -197,7 +186,7 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
             }
             result.append(single_result)
         return result
-        
+
     def html(self, snippet_group=None, identifiers=None, layout_options=None):
         """
         Html output for given identifiers. Optionally layout_options
@@ -210,7 +199,7 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
         if snippet_group is not None:
             snippets = snippet_group.snippets.all()
             identifiers = [snippet.identifier for snippet in snippets]
-            
+
         graph_img_url = reverse(
             "lizard_waterregime.workspace_item_graph_image",
             kwargs={'workspace_item_id': self.workspace_item.id},
@@ -225,26 +214,19 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
             graphs.append({
                 'afdeling': identifier['afdeling'],
                 'graph_img_url': graph_img_url + afdeling,
-                'bar_img_url': bar_img_url + afdeling
-                })
+                'bar_img_url': bar_img_url + afdeling})
         return super(AdapterWaterRegime, self).html_default(
             snippet_group=snippet_group,
             identifiers=identifiers,
             layout_options=layout_options,
             template='lizard_waterregime/popup.html',
             extra_render_kwargs={
-                'graphs': graphs,
-                #'graph_img_url': graph_img_url + afdeling,
-                #'bar_img_url': bar_img_url + afdeling,
-            }
-        )        
-            
+                'graphs': graphs})
+
     def location(self, afdeling, google_x, google_y, layout=None):
         """Lookup 'peilgebied' by 'afdeling'
 
         """
-        shape = WaterRegimeShape.objects.get(afdeling=afdeling)
-        gid = shape.gid
         identifier = {
             'afdeling': afdeling,
             'google_x': google_x,
@@ -252,14 +234,13 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
         }
 
         return {
-            'name': 'Peilgebied: ' + afdeling[:2]+'-'+afdeling[2:],
+            'name': 'Peilgebied: ' + afdeling[:2] + '-' + afdeling[2:],
             'shortname': afdeling,
             'object': None,
             'workspace_item': self.workspace_item,
             'google_coords': (google_x, google_y),
             'identifier': identifier,
             }
-
 
     class Colorfunc(object):
         """ Class with colorfunction method."""
@@ -268,7 +249,7 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
             self.regimeranges = {}
             for s in self.seasons:
                 self.regimeranges[s] = s.range_set.all()
-                
+
         def season(self, dt):
             for s in self.seasons:
                 if (
@@ -281,13 +262,12 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
                     ) or (
                      dt.month == s.month_to and
                      dt.day <= s.day_to
-                    ) 
+                    )
                 ):
                     return s
-                
-                    
+
         def colorfunc(self, datetime, value):
-            """ Return the colorfunction corresponding to value and datetime."""
+            """ Return the colorfunc corresponding to value and datetime."""
             for r in self.regimeranges[self.season(datetime)]:
             # only valid range if at least one limit is set
                 if r.upper_limit or r.lower_limit:
@@ -298,21 +278,20 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
                         r.upper_limit == None or
                         value < float(r.upper_limit)
                        ):
-                        color = r.regime.color_rgba() 
+                        color = r.regime.color_rgba()
                         return color
 
             # if no rule applied, get this ugly green color.
-            return (0,1,0,0)
+            return (0, 1, 0, 0)
 
-
-    def graph_image(self, identifier_list,start_date, end_date,
+    def graph_image(self, identifier_list, start_date, end_date,
                     width=None, height=None, layout_extra=None):
         """Visualize scores or measures in a graph each row is an area.
-        
+
         Not suitable for collages presently, since the 'afdeling' is passed
         via the image url.
         """
-        
+
         if width is None:
             width = 380.0
         if height is None:
@@ -324,42 +303,40 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
         shape = WaterRegimeShape.objects.get(
             afdeling=identifier_list[0]['afdeling']
         )
-        
-        now = datetime.now()
-        
-        events_weighted_pmine,events_p,events_e = (
+
+        events_weighted_pmine, events_p, events_e = (
             RegimeCalculator.weighted_precipitation_surplus(
                 shape,
                 datetime(start_date.year, start_date.month, start_date.day),
                 datetime(end_date.year, end_date.month, end_date.day)
             )
         )
-        
+
         if events_e.size > 0:
-            graph.axes.plot(events_e[:,0],events_e[:,1],
-                color='red', label='E (mm/dag)',linestyle='',marker='o')
-#        if events_p.size > 0:
-#            graph.axes.plot(events_p[:,0],events_p[:,1],
-#                color='blue', label='P (mm/uur)',linestyle='-',marker='.')
+            graph.axes.plot(events_e[:, 0], events_e[:, 1],
+                color='red', label='E (mm/dag)', linestyle='', marker='o')
         if events_p.size > 0:
-            graph.axes.bar(events_p[:,0],events_p[:,1],1./24,edgecolor='blue',
+            graph.axes.bar(events_p[:, 0], events_p[:, 1], 1. / 24,
+                edgecolor='blue',
                 color='blue', label='P (mm/uur)')
         if events_weighted_pmine.size > 0:
             graph.axes.plot(
-                events_weighted_pmine[:,0],
-                events_weighted_pmine[:,1],
-                'darkgreen', label='P - E (mm/dag)',linestyle='-',marker='.')
-        
+                events_weighted_pmine[:, 0],
+                events_weighted_pmine[:, 1],
+                'darkgreen',
+                label='P - E (mm/dag)',
+                linestyle='-',
+                marker='.')
 
         # Create an extra margin outside the data
-        margin = 0.1 # Fraction of ylim padding outside data
+        margin = 0.1  # Fraction of ylim padding outside data
         mins = []
         maxs = []
 
-        for arr in (events_weighted_pmine,events_p,events_e):
+        for arr in (events_weighted_pmine, events_p, events_e):
             if arr.size > 0:
-                mins.append(min(arr[:,1]))
-                maxs.append(max(arr[:,1]))
+                mins.append(min(arr[:, 1]))
+                maxs.append(max(arr[:, 1]))
 
         if len(mins) == 0:
             lowest_value = 0.
@@ -376,26 +353,26 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
             lowest_value - margin * span,
             highest_value + margin * span
         )
-        
+
         # Labeling and legend position
         #graph.axes.set_ylabel('Neerslagoverschot (mm/dag)')
         graph.legend_on_bottom_height = 0.15
         graph.axes.legend(bbox_to_anchor=(0., -0.3, 1., 1.),
-        loc=3,ncol=4,mode="expand", borderaxespad=0.)   
+        loc=3, ncol=4, mode="expand", borderaxespad=0.)
 
         response = graph.http_png()
-        response['Cache-Control'] = 'max-age=15' 
+        response['Cache-Control'] = 'max-age=15'
 
         return response
 
     def bar_image(self, identifier_list, start_date, end_date,
         width=None, height=None, layout_extra=None):
         """Return a colored bar representing the regime against the time.
-        
+
         Not suitable for collages presently, since the 'afdeling' is passed
         via the image url.
         """
-        
+
         if width is None:
             width = 380.0
         if height is None:
@@ -404,10 +381,8 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
         shape = WaterRegimeShape.objects.get(
             afdeling=identifier_list[0]['afdeling']
         )
-        
-        start = datetime.now()
-        
-        events_weighted_pmine,events_p,events_e = (
+
+        events_weighted_pmine, events_p, events_e = (
             RegimeCalculator.weighted_precipitation_surplus(
                 shape,
                 datetime(start_date.year, start_date.month, start_date.day),
@@ -415,31 +390,24 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
             )
         )
 
-        start = datetime.now()
-
         graph = adapter.Graph(start_date, end_date, width, height)
         graph.add_today()
 
         # Make a nice broken_barh:
         cf = self.Colorfunc()
-        
-        start = datetime.now()
 
-        colors = [cf.colorfunc(dt,v) for dt,v in filter(
-            lambda x: not isnan(x[1]),events_weighted_pmine)]
+        colors = [cf.colorfunc(dt, v) for dt, v in filter(
+            lambda x: not isnan(x[1]), events_weighted_pmine)]
         xranges = [(
-            date2num(datetime(dt.year,dt.month,dt.day,dt.hour)),
-            1./24
-        ) for dt,v in filter(lambda x: not isnan(x[1]),events_weighted_pmine)]
-        yrange = (0.1,0.8)
+            date2num(datetime(dt.year, dt.month, dt.day, dt.hour)),
+            1. / 24
+        ) for dt, v in filter(
+            lambda x: not isnan(x[1]), events_weighted_pmine)]
+        yrange = (0.1, 0.8)
 
-        start = datetime.now()
-
-        graph.axes.broken_barh(xranges,yrange,facecolors=colors,linewidth=0,
+        graph.axes.broken_barh(xranges, yrange, facecolors=colors, linewidth=0,
         antialiased=False,
         )
-
-        start = datetime.now()
 
         # Legend building
         from matplotlib.patches import Rectangle
@@ -450,15 +418,15 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
             labels.append(r.name)
         # Make room for the legend, see the graph class from lizard-map
         graph.legend_on_bottom_height = 0.3
-        graph.axes.legend(artists,labels,bbox_to_anchor=(0., -0.7, 1., 1.),
-        loc=3,ncol=4,mode="expand", borderaxespad=0.)
+        graph.axes.legend(artists, labels, bbox_to_anchor=(0., -0.7, 1., 1.),
+        loc=3, ncol=4, mode="expand", borderaxespad=0.)
 
         graph.axes.grid()
         graph.axes.set_yticks([])
         graph.axes.set_ylabel('Regime')
 
         response = graph.http_png()
-        response['Cache-Control'] = 'max-age=15' 
+        response['Cache-Control'] = 'max-age=15'
 
         return response
 
@@ -475,12 +443,12 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
         if icon_style is None:
             icon_style = {
                 'icon': 'waterbalance.png',
-                'color': (0.5,1.0,0.5,0),
+                'color': (0.5, 1.0, 0.5, 0),
             }
         output_filename = sm.get_symbol_transformed(icon_style['icon'],
                                                     **icon_style)
-        return settings.MEDIA_URL + 'generated_icons/' + output_filename   
-        
+        return settings.MEDIA_URL + 'generated_icons/' + output_filename
+
     def legend(self, updates=None):
         """Return a legend in a list of dictionaries."""
 
@@ -488,17 +456,17 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
 
         for r in Regime.objects.all():
             img_url = self.symbol_url(
-                icon_style = {
+                icon_style={
                     'icon': 'empty.png',
                     'color': r.color_rgba(),
                 }
             )
             description = r.name
             legend_result.append({
-                'img_url': img_url, 
+                'img_url': img_url,
                 'description': description,
             })
-       
+
         return legend_result
 
     def values(self, identifier_list, start_date, end_date):
