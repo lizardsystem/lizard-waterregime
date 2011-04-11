@@ -190,30 +190,22 @@ class RegimeCalculator(object):
 
     @classmethod
     def refresh(cls, dt):
-        """Insert PrecipitationSurplus values in database.
+        """Update PrecipitationSurplus values in database."""
 
-        All PrecipitationSurplus objects in de database are deleted.
-        To be called from the waterregime adapter."""
-
-        PrecipitationSurplus.objects.all().delete()
-        shapes = WaterRegimeShape.objects.all()
+        records = PrecipitationSurplus.objects.filter(
+            date_modified__lt=datetime.now() - timedelta(hours=1))
 
         valid_values = 0
-        for s in shapes:
+        for r in records:
             pmine, p, e = cls.weighted_precipitation_surplus(
-                shape=s, dt1=dt, dt2=dt)
+                shape=r.waterregimeshape, dt1=dt, dt2=dt)
             if pmine.shape == (1, 2) and not pmine[0, 1] == NaN:
-                value = pmine[0, 1]
-                valid = 'Y'
+                r.value = pmine[0, 1]
+                r.valid = 'Y'
                 valid_values += 1
             else:
-                value = 0
-                valid = 'N'
-            p = PrecipitationSurplus(
-                waterregimeshape=s,
-                date=_first_of_hour(dt),
-                value=value,
-                valid=valid, )
-            p.save()
+                r.value = 0
+                r.valid = 'N'
+            r.save()
 
         return valid_values

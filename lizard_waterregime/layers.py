@@ -96,8 +96,6 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
         db_settings = settings.DATABASES['default']
 
         # Refresh the p min e values in the database if necessary.
-        # Tricky in a multi-user environment: between creating
-        # and reading, other users can touch the table...
         RegimeCalculator.refresh(self.regimedatetime)
         shape_view = str("""(
             select
