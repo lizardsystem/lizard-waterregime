@@ -19,6 +19,7 @@ install_requires = [
     'timeseries',
     'django-nose',
     'pkginfo',
+    'south'
     ],
 
 tests_require = [

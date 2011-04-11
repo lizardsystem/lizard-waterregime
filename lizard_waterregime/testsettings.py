@@ -21,6 +21,7 @@ INSTALLED_APPS = [
     'lizard_waterregime',
     'lizard_ui',
     'staticfiles',
+    'south',
     'compressor',
     'django_nose',
     'django_extensions',

@@ -5,7 +5,15 @@ Changelog of lizard-waterregime
 0.2 (unreleased)
 ----------------
 
-- Nothing changed yet.
+- Switched to Oracle.
+
+- Implemented calculator.
+
+- Improved graphs.
+
+- Added admin pages.
+
+- Added South.
 
 
 0.1 (2011-03-24)
