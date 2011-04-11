@@ -333,9 +333,12 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
 
         for arr in (events_weighted_pmine, events_p, events_e):
             if arr.size > 0:
-                mins.append(min(arr[:, 1]))
-                maxs.append(max(arr[:, 1]))
-
+                arrmin = min(arr[:, 1])
+                if not isnan(arrmin):
+                    mins.append(arrmin)
+                arrmax = max(arr[:, 1])
+                if not isnan(arrmax):
+                    maxs.append(arrmax)
         if len(mins) == 0:
             lowest_value = 0.
         else:

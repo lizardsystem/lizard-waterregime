@@ -5,7 +5,12 @@ Changelog of lizard-waterregime
 0.3 (unreleased)
 ----------------
 
-- Nothing changed yet.
+- Fixed scaling bug on graph when events contain NaNs.
+
+- Fixture zzl_waterregime extended with precipitationsurplus records.
+
+- Bugfixed multithreading bug in calculator.py. Performance is improved
+  as a side-effect.
 
 
 0.2 (2011-04-11)
