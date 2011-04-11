@@ -415,7 +415,6 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
             )
         )
 
-        logger.debug(datetime.now() - start)
         start = datetime.now()
 
         graph = adapter.Graph(start_date, end_date, width, height)
@@ -424,10 +423,8 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
         # Make a nice broken_barh:
         cf = self.Colorfunc()
         
-        logger.debug(datetime.now() - start)
         start = datetime.now()
 
-        logger.debug(events_weighted_pmine)
         colors = [cf.colorfunc(dt,v) for dt,v in filter(
             lambda x: not isnan(x[1]),events_weighted_pmine)]
         xranges = [(
@@ -436,14 +433,12 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
         ) for dt,v in filter(lambda x: not isnan(x[1]),events_weighted_pmine)]
         yrange = (0.1,0.8)
 
-        logger.debug(datetime.now() - start)
         start = datetime.now()
 
         graph.axes.broken_barh(xranges,yrange,facecolors=colors,linewidth=0,
         antialiased=False,
         )
 
-        logger.debug(datetime.now() - start)
         start = datetime.now()
 
         # Legend building
