@@ -2,7 +2,7 @@ Changelog of lizard-waterregime
 ===================================================
 
 
-0.2 (unreleased)
+0.2 (2011-04-11)
 ----------------
 
 - Switched to Oracle.
