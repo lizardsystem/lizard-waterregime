@@ -2,8 +2,8 @@ Changelog of lizard-waterregime
 ===================================================
 
 
-0.3 (unreleased)
-----------------
+0.2.1 (2011-04-11)
+------------------
 
 - Fixed scaling bug on graph when events contain NaNs.
 
