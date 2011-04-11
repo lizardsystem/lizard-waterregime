@@ -5,7 +5,7 @@ Changelog of lizard-waterregime
 0.3 (unreleased)
 ----------------
 
-- Nothing changed yet.
+- Removed timeseries dependency
 
 
 0.2.1 (2011-04-11)
