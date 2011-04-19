@@ -2,7 +2,7 @@ Changelog of lizard-waterregime
 ===================================================
 
 
-0.3 (unreleased)
+0.3 (2011-04-19)
 ----------------
 
 - Changed layers to use shapefiles rather than postgres spatial database
