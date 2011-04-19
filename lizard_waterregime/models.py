@@ -21,7 +21,7 @@ class WaterRegimeShape(models.Model):
     afdeling = models.CharField(max_length=5, unique=True)
     naam = models.CharField(max_length=50)
     area_m2 = models.DecimalField(max_digits=20, decimal_places=10)
-    the_geom = models.MultiPolygonField(srid= -1)
+    the_geom = models.MultiPolygonField(srid= 28992)
     objects = models.GeoManager()
 
     def get_cropfactor(self, date=date.today()):
@@ -56,6 +56,17 @@ class WaterRegimeShape(models.Model):
     class Meta:
        verbose_name = "Peilgebied"
        verbose_name_plural = "Peilgebieden"
+       
+    def value(self):
+        """Shortcut to self.precipitation_set.all()[0].value if valid.
+        
+        Else: None
+        """
+        p = self.precipitationsurplus_set.all()[0]
+        if p.valid == 'Y':
+            return p.value
+        else:
+            return None
 
 
 class LandCover(models.Model):
@@ -313,7 +324,7 @@ class Regime(models.Model):
         return self.name
     
     class Meta:
-        ordering = ['order']
+        ordering = ['order']        
     
 
 class Season(models.Model):
@@ -331,6 +342,24 @@ class Season(models.Model):
         verbose_name = "Seizoen"
         verbose_name_plural = "Seizoenen"
 
+    @classmethod
+    def season(cls, dt):
+        for s in cls.objects.all():
+            if (
+                (
+                    dt.month > s.month_from and
+                    dt.month < s.month_to
+                ) or (
+                    dt.month == s.month_from and
+                    dt.day >= s.day_from
+                ) or (
+                 dt.month == s.month_to and
+                 dt.day <= s.day_to
+                )
+            ):
+                return s
+        return None
+
 class Range(models.Model):
     regime = models.ForeignKey(Regime)
     season = models.ForeignKey(Season)
@@ -346,7 +375,26 @@ class Range(models.Model):
     class Meta:
         verbose_name = "Grenswaarde"
         verbose_name_plural = "Grenswaarden"
-    
+
+    @classmethod
+    def find(cls, datetime, value):
+        """Return range corresponding to given datetime and value.
+        
+        Else: None
+        """
+        season = Season.season(datetime)
+        for r in cls.objects.filter(season=season):
+            # only valid range if at least one limit is set
+            if r.upper_limit or r.lower_limit:
+                if (
+                    r.lower_limit == None or
+                    value >= float(r.lower_limit)
+                   ) and (
+                    r.upper_limit == None or
+                    value < float(r.upper_limit)
+                   ):
+                    return r
+        return None
 
 class PrecipitationSurplus(models.Model):
     waterregimeshape = models.ForeignKey(WaterRegimeShape)

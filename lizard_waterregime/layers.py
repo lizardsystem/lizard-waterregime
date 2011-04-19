@@ -1,6 +1,8 @@
 import logging
 import mapnik
 import os
+import pkg_resources
+
 from datetime import datetime
 from matplotlib.dates import date2num
 
@@ -34,35 +36,35 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
 
     regimedatetime = datetime.now()
 
-    def _mapnik_style(self, season):
+    def _mapnik_style(self, datetime):
         """ Return a mapnik_style, accounting for season """
 
-        def _filters(season):
+#        def _filters(season):
 
-            """Generate mapnikfilters and colors for the ranges in this
-            season."""
-            colors = []
-            filters = []
+#            """Generate mapnikfilters and colors for the ranges in this
+#            season."""
+#            colors = []
+#            filters = []
 
-            regimeranges = season.range_set.all()
-            for r in regimeranges:
-                # only append filter and color if at least one range is set
-                if r.lower_limit or r.upper_limit:
-                    mapnik_filter = "[valid] = 'Y' and "
-                    if r.lower_limit:
-                        mapnik_filter += '[value] > ' + str(r.lower_limit)
-                    if r.lower_limit and r.upper_limit:
-                        mapnik_filter += ' and '
-                    if r.upper_limit:
-                        mapnik_filter += '[value] <= ' + str(r.upper_limit)
-                    filters.append(mapnik_filter)
-                    colors.append(r.regime.color_255())
+#            regimeranges = season.range_set.all()
+#            for r in regimeranges:
+#                # only append filter and color if at least one range is set
+#                if r.lower_limit or r.upper_limit:
+#                    mapnik_filter = "[valid] = 'Y' and "
+#                    if r.lower_limit:
+#                        mapnik_filter += '[value] > ' + str(r.lower_limit)
+#                    if r.lower_limit and r.upper_limit:
+#                        mapnik_filter += ' and '
+#                    if r.upper_limit:
+#                        mapnik_filter += '[value] <= ' + str(r.upper_limit)
+#                    filters.append(mapnik_filter)
+#                    colors.append(r.regime.color_255())
 
-                # Extra filter for invalid pmine's
-                filters.append("[valid] = 'N'")
-                colors.append((127, 0, 127, 63))
+#                # Extra filter for invalid pmine's
+#                filters.append("[valid] = 'N'")
+#                colors.append((127, 0, 127, 63))
 
-            return zip(colors, filters)
+#            return zip(colors, filters)
 
         def _mapnik_rule(color, mapnik_filter):
             """ Return a mapnik_rule
@@ -70,7 +72,7 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
             Here also the line thickness and fill opacity can be set."""
             rule = mapnik.Rule()
 
-            rule.filter = mapnik.Filter(mapnik_filter)
+            rule.filter = mapnik.Filter(str(mapnik_filter))
 
             mapnik_color = mapnik.Color(*color)
             symb_line = mapnik.LineSymbolizer(mapnik_color, 2)
@@ -82,10 +84,35 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
             return rule
 
         mapnik_style = mapnik.Style()
-        mapnik_style.rules.extend(
-            [_mapnik_rule(*args) for args in _filters(season)])
+        for shape in WaterRegimeShape.objects.all():
+            precipitationsurplus = shape.precipitationsurplus_set.all()[0]
+            if precipitationsurplus.valid == 'Y':
+                regime_range = Range.find(datetime, precipitationsurplus.value)
+                color = regime_range.regime.color_rgba()
+            else:
+                color = (127, 0, 127, 255)
+            mapnik_filter = "[AFDELING] = '%s'" % shape.afdeling
+            mapnik_rule = _mapnik_rule(color, mapnik_filter)
+            mapnik_style.rules.append(mapnik_rule)
+        #mapnik_style.rules.extend(
+        #    [_mapnik_rule(*args) for args in _filters(season)])
         return mapnik_style
 
+    def _default_mapnik_style(self):
+        """
+        Makes default mapnik style
+        """
+        area_looks = mapnik.PolygonSymbolizer(mapnik.Color('#ffb975'))
+        # ^^^ light brownish
+        line_looks = mapnik.LineSymbolizer(mapnik.Color('#dd0000'), 1)
+        area_looks.fill_opacity = 0.5
+        layout_rule = mapnik.Rule()
+        layout_rule.symbols.append(area_looks)
+        layout_rule.symbols.append(line_looks)
+        area_style = mapnik.Style()
+        area_style.rules.append(layout_rule)
+        return area_style
+        
     def layer(self, layer_ids=None, request=None):
         """Generates and returns mapnik layers and styles.
         """
@@ -93,42 +120,63 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
         layers = []
         styles = {}
 
-        db_settings = settings.DATABASES['default']
-
-        # Refresh the p min e values in the database if necessary.
-        RegimeCalculator.refresh(self.regimedatetime)
-        shape_view = str("""(
-            select
-                shp.gid,
-                shp.afdeling,
-                shp.naam,
-                shp.area_m2,
-                shp.the_geom,
-                pme.value,
-                pme.valid
-            from
-                lizard_waterregime_waterregimeshape shp
-                join lizard_waterregime_precipitationsurplus pme
-                    on pme.waterregimeshape_id = shp.gid
-        ) result_view""")
-        layer = mapnik.Layer('Geometry from PostGIS')
-        # RD = rijksdriehoek. Somehow 'Google' is also mentioned originally?
-        layer.srs = RD
-        layer.datasource = mapnik.PostGIS(
-            host=db_settings['HOST'],
-            user=db_settings['USER'],
-            password=db_settings['PASSWORD'],
-            dbname=db_settings['NAME'],
-            table=shape_view)
+        # TODO remove hardcoded filename
+        layer_filename = pkg_resources.resource_filename(
+            'zzl',
+            'shapes/peilgebieden.shp')
+        
+        layer = mapnik.Layer('RegimeLayer', RD)
+    
+        layer.datasource = mapnik.Shapefile(
+            file=layer_filename)
 
         style_name = 'waterregime_style'
 
         layer.styles.append(style_name)
         layers.append(layer)
-        cf = self.Colorfunc()
-        mapnik_style = self._mapnik_style(cf.season(self.regimedatetime))
+#        cf = self.Colorfunc()
+        mapnik_style = self._mapnik_style(self.regimedatetime)
+#        mapnik_style = self._default_mapnik_style()
         styles[style_name] = mapnik_style
 
+
+#        db_settings = settings.DATABASES['default']
+
+#        # Refresh the p min e values in the database if necessary.
+#        RegimeCalculator.refresh(self.regimedatetime)
+#        shape_view = str("""(
+#            select
+#                shp.gid,
+#                shp.afdeling,
+#                shp.naam,
+#                shp.area_m2,
+#                shp.the_geom,
+#                pme.value,
+#                pme.valid
+#            from
+#                lizard_waterregime_waterregimeshape shp
+#                join lizard_waterregime_precipitationsurplus pme
+#                    on pme.waterregimeshape_id = shp.gid
+#        ) result_view""")
+#        layer = mapnik.Layer('Geometry from PostGIS')
+#        # RD = rijksdriehoek. Somehow 'Google' is also mentioned originally?
+#        layer.srs = RD
+#        layer.datasource = mapnik.Occi(
+#            host=db_settings['HOST'],
+#            user=db_settings['USER'],
+#            password=db_settings['PASSWORD'],
+#            dbname=db_settings['NAME'],
+#            table=shape_view)
+
+#        style_name = 'waterregime_style'
+
+#        layer.styles.append(style_name)
+#        layers.append(layer)
+#        cf = self.Colorfunc()
+#        mapnik_style = self._mapnik_style(cf.season(self.regimedatetime))
+#        styles[style_name] = mapnik_style
+
+        print layers
         return layers, styles
 
     def search(self, google_x, google_y, radius=None):
@@ -157,11 +205,11 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
         feature_set = mapnik_map.query_point(0, google_x, google_y)
 
         for feature in feature_set.features:
-            afdeling = feature.properties['afdeling']
-            gid = feature.properties['gid']
-            valid = feature.properties['valid']
-            value = feature.properties['value']
-            if valid == 'Y':
+            afdeling = feature.properties['AFDELING']
+            #gid = feature.properties['gid']
+            shape = WaterRegimeShape.objects.get(afdeling=afdeling)
+            value = shape.value()
+            if value is not None:
                 precipitationsurplus = '%1.1f mm/dag' % value
             else:
                 precipitationsurplus = 'Onbekend'
@@ -175,7 +223,7 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
             }
             single_result = {
                 'distance': 0.0,
-                'object': gid,
+                'object': None,  # gid,
                 'name': popup_string,
                 'shortname': afdeling,
                 'google_coords': (google_x, google_y),

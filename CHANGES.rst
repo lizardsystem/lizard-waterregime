@@ -5,7 +5,9 @@ Changelog of lizard-waterregime
 0.3 (unreleased)
 ----------------
 
-- Nothing changed yet.
+- Changed layers to use shapefiles rather than postgres spatial database
+
+- Added various help functions to models
 
 
 0.2.2 (2011-04-11)
