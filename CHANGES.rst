@@ -5,7 +5,7 @@ Changelog of lizard-waterregime
 0.3.2 (unreleased)
 ------------------
 
-- Nothing changed yet.
+- Implemented nearest() method in calculator to extend evap range
 
 
 0.3.1 (2011-04-20)
