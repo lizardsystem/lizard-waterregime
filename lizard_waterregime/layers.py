@@ -16,8 +16,9 @@ from lizard_map.coordinates import RD
 from lizard_map.workspace import WorkspaceItemAdapter
 from lizard_map.symbol_manager import SymbolManager
 
-from lizard_waterregime.models import Regime
 from lizard_waterregime.calculator import RegimeCalculator
+from lizard_waterregime.models import Regime
+from lizard_waterregime.models import Range
 from lizard_waterregime.models import Season
 from lizard_waterregime.models import WaterRegimeShape
 
@@ -88,9 +89,9 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
             precipitationsurplus = shape.precipitationsurplus_set.all()[0]
             if precipitationsurplus.valid == 'Y':
                 regime_range = Range.find(datetime, precipitationsurplus.value)
-                color = regime_range.regime.color_rgba()
+                color = regime_range.regime.color_255()
             else:
-                color = (127, 0, 127, 255)
+                color = (127, 127, 127, 255)
             mapnik_filter = "[AFDELING] = '%s'" % shape.afdeling
             mapnik_rule = _mapnik_rule(color, mapnik_filter)
             mapnik_style.rules.append(mapnik_rule)
@@ -134,16 +135,17 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
 
         layer.styles.append(style_name)
         layers.append(layer)
-#        cf = self.Colorfunc()
+
+        # Refresh the p min e values in the database if necessary.
+        RegimeCalculator.refresh(self.regimedatetime)
+
         mapnik_style = self._mapnik_style(self.regimedatetime)
-#        mapnik_style = self._default_mapnik_style()
         styles[style_name] = mapnik_style
+        
 
 
 #        db_settings = settings.DATABASES['default']
 
-#        # Refresh the p min e values in the database if necessary.
-#        RegimeCalculator.refresh(self.regimedatetime)
 #        shape_view = str("""(
 #            select
 #                shp.gid,
@@ -176,7 +178,6 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
 #        mapnik_style = self._mapnik_style(cf.season(self.regimedatetime))
 #        styles[style_name] = mapnik_style
 
-        print layers
         return layers, styles
 
     def search(self, google_x, google_y, radius=None):
@@ -379,29 +380,36 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
         mins = []
         maxs = []
 
-        for arr in (events_weighted_pmine, events_p, events_e):
-            if arr.size > 0:
-                arrmin = min(arr[:, 1])
-                if not isnan(arrmin):
-                    mins.append(arrmin)
-                arrmax = max(arr[:, 1])
-                if not isnan(arrmax):
-                    maxs.append(arrmax)
-        if len(mins) == 0:
-            lowest_value = 0.
-        else:
-            lowest_value = min(mins)
+#        for arr in (events_weighted_pmine, events_p, events_e):
+#            if arr.size > 0:
+#                arrmin = min(arr[:, 1])
+#                if not isnan(arrmin):
+#                    mins.append(arrmin)
+#                arrmax = max(arr[:, 1])
+#                if not isnan(arrmax):
+#                    maxs.append(arrmax)
+#        if len(mins) == 0:
+#            lowest_value = 0.
+#        else:
+#            lowest_value = min(mins)
 
-        if len(maxs) == 0:
-            highest_value = 1.
-        else:
-            highest_value = max(maxs)
+#        if len(maxs) == 0:
+#            highest_value = 1.
+#        else:
+#            highest_value = max(maxs)
 
-        span = highest_value - lowest_value
-        graph.axes.set_ylim(
-            lowest_value - margin * span,
-            highest_value + margin * span
-        )
+#        span = highest_value - lowest_value
+#        graph.axes.set_ylim(
+#            lowest_value - margin * span,
+#            highest_value + margin * span
+#        )
+        
+        data_low, data_high = graph.axes.dataLim.get_points()[:, 1]
+        data_span = data_high - data_low
+        view_low = data_low - data_span * margin
+        view_high = data_high + data_span * margin
+        graph.axes.set_ylim(view_low, view_high)
+
 
         # Labeling and legend position
         #graph.axes.set_ylabel('Neerslagoverschot (mm/dag)')

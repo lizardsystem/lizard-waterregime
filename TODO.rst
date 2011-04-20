@@ -1,8 +1,11 @@
 TODO
 ====
 
+- remove old commented code from layers.py
+- Improve calculator.map_events so that it accepts non-wholeday-datetimes.
+    evaporation datetimes are now trunctated as a quick fix.
+- Remove hardcoded shapefilename from layers.py
 - PyChecker
-- Django South
 - Slider to see colors on the map for future dates
 - Add tests
 - Put the 'Onbekend' - color and name in the database, instead of hardcoded

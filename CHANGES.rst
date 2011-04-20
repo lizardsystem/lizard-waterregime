@@ -5,7 +5,11 @@ Changelog of lizard-waterregime
 0.4 (unreleased)
 ----------------
 
-- Nothing changed yet.
+- Changed the p-e-unknown color to gray.
+
+- Margin for graph determined from axes.dataLim attribute 
+
+- Fixed not-updating mapcolors bug.
 
 
 0.3 (2011-04-19)

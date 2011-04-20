@@ -12,6 +12,7 @@ from numpy import array
 from numpy import concatenate
 from numpy import convolve
 from numpy import interp
+from numpy import isnan
 from numpy import NaN
 from numpy import ones
 from numpy import zeros
@@ -63,17 +64,18 @@ class RegimeCalculator(object):
         """
 
         e_mapped = []
-        e_dict = dict((event[0], event[1]) for event in e_series)
-
+        e_dict = dict(
+            (datetime(event[0].year, event[0].month, event[0].day), event[1])
+            for event in e_series)
         for event in p_series:
 
             dt = event[0]
 
-            try:
-                dt_before = datetime(dt.year, dt.month, dt.day)
-                e_before = float(e_dict[dt_before])
-            except:
-                e_before = None
+#            try:
+            dt_before = datetime(dt.year, dt.month, dt.day)
+            e_before = float(e_dict[dt_before])
+#            except:
+#                e_before = None
 
             try:
                 dt_after = dt_before + timedelta(days=1)
@@ -199,7 +201,7 @@ class RegimeCalculator(object):
         for r in records:
             pmine, p, e = cls.weighted_precipitation_surplus(
                 shape=r.waterregimeshape, dt1=dt, dt2=dt)
-            if pmine.shape == (1, 2) and not pmine[0, 1] == NaN:
+            if pmine.shape == (1, 2) and not isnan(pmine[0, 1]):
                 r.value = pmine[0, 1]
                 r.valid = 'Y'
                 valid_values += 1
