@@ -2,8 +2,8 @@ Changelog of lizard-waterregime
 ===================================================
 
 
-0.4 (unreleased)
-----------------
+0.3.1 (2011-04-20)
+------------------
 
 - Changed the p-e-unknown color to gray.
 
