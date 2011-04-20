@@ -71,11 +71,11 @@ class RegimeCalculator(object):
 
             dt = event[0]
 
-#            try:
-            dt_before = datetime(dt.year, dt.month, dt.day)
-            e_before = float(e_dict[dt_before])
-#            except:
-#                e_before = None
+            try:
+                dt_before = datetime(dt.year, dt.month, dt.day)
+                e_before = float(e_dict[dt_before])
+            except:
+                e_before = None
 
             try:
                 dt_after = dt_before + timedelta(days=1)
@@ -99,9 +99,17 @@ class RegimeCalculator(object):
 
     @classmethod
     def nearest(cls, dt, series):
-        """
-        """
-        return NaN
+        """ Return last evaporation as long as it is not older than 3 days.
+        
+        Not really nearest..."""
+        print 'nearest used'
+        delta = dt - series[-1][0]
+        print delta.days
+        if 0 <= delta.days < 3:
+            print 'returning %s' % series[-1][1]
+            return series[-1][1]
+        else:
+            return NaN
 
     @classmethod
     def weights(cls, r, tmax):
