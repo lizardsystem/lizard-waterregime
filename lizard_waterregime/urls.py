@@ -17,7 +17,7 @@ urlpatterns = patterns('',
     url(r'^search_name/',
         'lizard_map.views.search_name',
         name="lizard_map.search_name"),
-        
+
     # Images other than the lizard-map default
     url(r'^workspace_item/(?P<workspace_item_id>\d+)/graph_image/',
         'lizard_waterregime.views.workspace_item_graph_image',
@@ -25,7 +25,6 @@ urlpatterns = patterns('',
     url(r'^workspace_item/(?P<workspace_item_id>\d+)/bar_image/',
         'lizard_waterregime.views.workspace_item_bar_image',
         name="lizard_waterregime.workspace_item_bar_image"),
-        
 )
 
 

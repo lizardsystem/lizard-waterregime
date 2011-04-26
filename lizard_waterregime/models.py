@@ -21,7 +21,7 @@ class WaterRegimeShape(models.Model):
     afdeling = models.CharField(max_length=5, unique=True)
     naam = models.CharField(max_length=50)
     area_m2 = models.DecimalField(max_digits=20, decimal_places=10)
-    the_geom = models.MultiPolygonField(srid= 28992)
+    the_geom = models.MultiPolygonField(srid=28992)
     objects = models.GeoManager()
 
     def get_cropfactor(self, date=date.today()):
@@ -54,12 +54,12 @@ class WaterRegimeShape(models.Model):
         return self.naam
 
     class Meta:
-       verbose_name = "Peilgebied"
-       verbose_name_plural = "Peilgebieden"
-       
+        verbose_name = "Peilgebied"
+        verbose_name_plural = "Peilgebieden"
+
     def value(self):
         """Shortcut to self.precipitation_set.all()[0].value if valid.
-        
+
         Else: None
         """
         p = self.precipitationsurplus_set.all()[0]
@@ -85,8 +85,8 @@ class LandCover(models.Model):
         ## date. We'll get them all at once and cache them for
         ## efficiency.
 
-        key = "CF" + date.strftime(".%m%d") ## E.g. CF.0403
-        value = cache.get(key) ## Crop factors (dict)
+        key = "CF" + date.strftime(".%m%d")  # E.g. CF.0403
+        value = cache.get(key)  # Crop factors (dict)
 
         if not value:
             cfs = CropFactor.objects.filter(month=date.month, day=date.day)
@@ -120,6 +120,7 @@ class LandCoverData(models.Model):
         unique_together = (("region", "cover"),)
         verbose_name = "Landgebruik"
         verbose_name_plural = "Landgebruik"
+
 
 class CropFactor(models.Model):
     """ Factor to correct the evaporation of a reference area for a
@@ -168,7 +169,7 @@ class TimeSeries(object):
 
     def events(self, start=datetime.min, end=datetime.max, missing=None):
         """ Returns all events between [start, end].
-        
+
         By default, any missing values between the first and last event are
         replaced by None. Magic values, e.g. -999.0, are not considered as
         missing - only datetimes that are completely absent.
@@ -209,7 +210,7 @@ class DefaultTimeSeries(models.Model, TimeSeries):
     Data is physically located in the default database.
     """
     name = models.CharField(max_length=64, unique=True)
-    hours = models.IntegerField() ## timedelta
+    hours = models.IntegerField()  # timedelta
 
     def raw_events(self, start=datetime.min, end=datetime.max):
         """
@@ -239,7 +240,7 @@ class FewsTimeSeries(models.Model, TimeSeries):
     Data is physically located in the fews database.
     """
     name = models.CharField(max_length=64, unique=True)
-    hours = models.IntegerField() ## timedelta
+    hours = models.IntegerField()  # timedelta
 
     ## Fews timeseries are uniquely defined by the following 5
     ## fields. We do rely on primary keys, because these may
@@ -286,7 +287,6 @@ class Constant(models.Model):
     value = models.FloatField()
     description = models.CharField(max_length=128, unique=True)
 
-
     @classmethod
     def get(cls, name):
         """ Returns the value of the constant or None if no constant
@@ -297,14 +297,12 @@ class Constant(models.Model):
         except Constant.DoesNotExist:
             return None
 
-
     def __unicode__(self):
         return self.name
 
     class Meta:
         verbose_name = "Constante"
         verbose_name_plural = "Constanten"
-
 
 
 class Regime(models.Model):
@@ -314,18 +312,18 @@ class Regime(models.Model):
 
     def color_255(self):
         """Return an rgb color tuple in the (255,255,255) format."""
-        return tuple(map(int,self.color255.split(',')))
+        return tuple(map(int, self.color255.split(',')))
 
     def color_rgba(self):
         """Return an rgba color tuple in the (1,1,1,1) format."""
-        return tuple([c/255. for c in self.color_255()] + [1])
-    
+        return tuple([c / 255. for c in self.color_255()] + [1])
+
     def __unicode__(self):
         return self.name
-    
+
     class Meta:
-        ordering = ['order']        
-    
+        ordering = ['order']
+
 
 class Season(models.Model):
     name = models.CharField(max_length=32)
@@ -333,12 +331,12 @@ class Season(models.Model):
     day_from = models.IntegerField()
     month_to = models.IntegerField()
     day_to = models.IntegerField()
-    
+
     def __unicode__(self):
         return self.name
 
     class Meta:
-        ordering = ['month_from','day_from']
+        ordering = ['month_from', 'day_from']
         verbose_name = "Seizoen"
         verbose_name_plural = "Seizoenen"
 
@@ -346,31 +344,21 @@ class Season(models.Model):
     def season(cls, dt):
         for s in cls.objects.all():
             if (
-                (
-                    dt.month > s.month_from and
-                    dt.month < s.month_to
-                ) or (
-                    dt.month == s.month_from and
-                    dt.day >= s.day_from
-                ) or (
-                 dt.month == s.month_to and
-                 dt.day <= s.day_to
-                )
-            ):
+                (dt.month > s.month_from and dt.month < s.month_to) or
+                (dt.month == s.month_from and dt.day >= s.day_from) or
+                (dt.month == s.month_to and dt.day <= s.day_to)):
                 return s
         return None
+
 
 class Range(models.Model):
     regime = models.ForeignKey(Regime)
     season = models.ForeignKey(Season)
     # limits refer to the 'neerslagoverschot'
     lower_limit = models.DecimalField(
-        max_digits = 4, decimal_places = 1, null = True, blank = True
-    )
+        max_digits=4, decimal_places=1, null=True, blank=True)
     upper_limit = models.DecimalField(
-        max_digits = 4, decimal_places = 1, null = True, blank = True
-    )
-    
+        max_digits=4, decimal_places=1, null=True, blank=True)
 
     class Meta:
         verbose_name = "Grenswaarde"
@@ -379,22 +367,20 @@ class Range(models.Model):
     @classmethod
     def find(cls, datetime, value):
         """Return range corresponding to given datetime and value.
-        
+
         Else: None
         """
         season = Season.season(datetime)
         for r in cls.objects.filter(season=season):
             # only valid range if at least one limit is set
             if r.upper_limit or r.lower_limit:
-                if (
-                    r.lower_limit == None or
-                    value >= float(r.lower_limit)
-                   ) and (
-                    r.upper_limit == None or
-                    value < float(r.upper_limit)
-                   ):
+                if ((r.lower_limit == None or
+                    value >= float(r.lower_limit)) and
+                    (r.upper_limit == None or
+                    value < float(r.upper_limit))):
                     return r
         return None
+
 
 class PrecipitationSurplus(models.Model):
     waterregimeshape = models.ForeignKey(WaterRegimeShape)

@@ -8,13 +8,12 @@ DEBUG = True
 TEMPLATE_DEBUG = True
 DATABASES = {
     # If you want to test with this database, put it in localsettings.py.
-    'default': { #postgres testdatabase at N&S
+    'default': {  # postgres testdatabase at N&S
         'ENGINE': 'django.contrib.gis.db.backends.postgis',
         'HOST': '127.0.0.1',
         'NAME': 'waterregime',
         'USER': 'buildout',
-        'PASSWORD': 'buildout'
-        },
+        'PASSWORD': 'buildout', },
     }
 SITE_ID = 1
 INSTALLED_APPS = [

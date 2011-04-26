@@ -1,7 +1,6 @@
 from lizard_waterregime.models import Constant
 from lizard_waterregime.models import PrecipitationSurplus
 from lizard_waterregime.models import TimeSeriesFactory
-from lizard_waterregime.models import WaterRegimeShape
 
 from datetime import datetime
 from datetime import timedelta
@@ -100,7 +99,7 @@ class RegimeCalculator(object):
     @classmethod
     def nearest(cls, dt, series):
         """ Return last evaporation as long as it is not older than 3 days.
-        
+
         Not really nearest..."""
         print 'nearest used'
         delta = dt - series[-1][0]

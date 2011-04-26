@@ -21,12 +21,12 @@ class CropFactorInline(admin.TabularInline):
 
 
 class LandCoverAdmin(admin.ModelAdmin):
-    inlines = [CropFactorInline,]
+    inlines = [CropFactorInline, ]
 admin.site.register(LandCover, LandCoverAdmin)
 
 
 class RangeAdmin(admin.ModelAdmin):
-    def link(self,other):
+    def link(self, other):
         return other
     list_display = (
         'link',
@@ -41,12 +41,12 @@ class RangeAdmin(admin.ModelAdmin):
         'lower_limit',
         'upper_limit',
     )
-    ordering = ['season','regime']
+    ordering = ['season', 'regime']
 admin.site.register(Range, RangeAdmin)
 
 
 class RegimeAdmin(admin.ModelAdmin):
-    def link(self,other):
+    def link(self, other):
         return other
     list_display = (
         'link',
@@ -63,7 +63,7 @@ admin.site.register(Regime, RegimeAdmin)
 
 
 class SeasonAdmin(admin.ModelAdmin):
-    def link(self,other):
+    def link(self, other):
         return other
     list_display = (
         'link',

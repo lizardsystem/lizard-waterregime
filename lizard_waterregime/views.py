@@ -73,18 +73,19 @@ def start(request,
             'use_workspaces': False,
         },
         context_instance=RequestContext(request))
-        
+
+
 def workspace_item_graph_image(request, workspace_item_id):
     """Shows image corresponding to workspace item and location identifier(s)
     only works with regime adapter
     identifier_list
     """
-    
+
 #    identifier_json_list = request.GET.getlist('identifier')
 #    identifier_list = [json.loads(identifier_json) for identifier_json in
 #                       identifier_json_list]
-    
-    identifier_list = [{'afdeling': request.GET.get('afdeling'),}]
+
+    identifier_list = [{'afdeling': request.GET.get('afdeling'), }]
 
     width = request.GET.get('width')
     height = request.GET.get('height')
@@ -105,9 +106,14 @@ def workspace_item_graph_image(request, workspace_item_id):
     # add animation slider position
     layout_extra = slider_layout_extra(request)
 
-    return workspace_item.adapter.graph_image(identifier_list, start_date, end_date,
-                                        width, height,
-                                        layout_extra=layout_extra)
+    return workspace_item.adapter.graph_image(
+        identifier_list,
+        start_date,
+        end_date,
+        width, height,
+        layout_extra=layout_extra,
+    )
+
 
 def workspace_item_bar_image(request, workspace_item_id):
     """Shows image corresponding to workspace item and location identifier(s)
@@ -118,8 +124,8 @@ def workspace_item_bar_image(request, workspace_item_id):
 #    identifier_json_list = request.GET.getlist('identifier')
 #    identifier_list = [json.loads(identifier_json) for identifier_json in
 #                       identifier_json_list]
-                       
-    identifier_list = [{'afdeling': request.GET.get('afdeling'),}]
+
+    identifier_list = [{'afdeling': request.GET.get('afdeling'), }]
 
     width = request.GET.get('width')
     height = request.GET.get('height')
@@ -140,7 +146,11 @@ def workspace_item_bar_image(request, workspace_item_id):
     # add animation slider position
     layout_extra = slider_layout_extra(request)
 
-    return workspace_item.adapter.bar_image(identifier_list, start_date, end_date,
-                                        width, height,
-                                        layout_extra=layout_extra)
-                
+    return workspace_item.adapter.bar_image(
+        identifier_list,
+        start_date,
+        end_date,
+        width,
+        height,
+        layout_extra=layout_extra,
+    )
