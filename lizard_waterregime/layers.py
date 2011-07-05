@@ -399,9 +399,9 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
 
         # Labeling and legend position
         #graph.axes.set_ylabel('Neerslagoverschot (mm/dag)')
-        graph.legend_on_bottom_height = 0.15
-        graph.axes.legend(bbox_to_anchor=(0., -0.3, 1., 1.),
-        loc=3, ncol=4, mode="expand", borderaxespad=0.)
+        graph.legend_on_bottom_height = 0.076
+        graph.axes.legend(bbox_to_anchor=(0., -0.36, 1., 1.),
+        loc=3, ncol=3, mode="expand", borderaxespad=0.)
 
         response = graph.http_png()
         response['Cache-Control'] = 'max-age=15'
@@ -456,7 +456,7 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
             labels.append(r.name)
         # Make room for the legend, see the graph class from lizard-map
         graph.legend_on_bottom_height = 0.3
-        graph.axes.legend(artists, labels, bbox_to_anchor=(0., -0.7, 1., 1.),
+        graph.axes.legend(artists, labels, bbox_to_anchor=(0., -0.8, 1., 1.),
         loc=3, ncol=4, mode="expand", borderaxespad=0.)
 
         graph.axes.grid()
