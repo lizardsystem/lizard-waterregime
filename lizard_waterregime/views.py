@@ -23,10 +23,8 @@ from django.template import RequestContext
 #from lizard_map import coordinates
 #from lizard_map.adapter import Graph
 from lizard_map.daterange import current_start_end_dates
-from lizard_map.daterange import DateRangeForm
 #from lizard_map.models import Workspace
 from lizard_map.models import WorkspaceItem
-from lizard_map.workspace import WorkspaceManager
 from lizard_map.animation import slider_layout_extra
 
 #from timeseries.timeseriesstub import TimeseriesStub
@@ -54,19 +52,11 @@ def start(request,
                    'title': 'waterregime',
                    'url': reverse('waterregime_start')})
 
-    workspace_manager = WorkspaceManager(request)
-    workspaces = workspace_manager.load_or_create()
-
-    date_range_form = DateRangeForm(
-        current_start_end_dates(request, for_form=True))
-
     shapes = WaterRegimeShape.objects.all()
 
     return render_to_response(template,
         {
             'crumbs': crumbs,
-            'workspaces': workspaces,
-            'date_range_form': date_range_form,
             'waterregime_shapes': shapes,
             'javascript_hover_handler': 'popup_hover_handler',
             'javascript_click_handler': 'popup_click_handler',

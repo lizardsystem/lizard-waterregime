@@ -7,7 +7,7 @@ Changelog of lizard-waterregime
 
 - Conformed code to pyflakes / pep8
 
-
+- Solved problems with date selector.
 
 
 0.3.2 (2011-04-20)
