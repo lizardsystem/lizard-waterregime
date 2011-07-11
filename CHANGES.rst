@@ -2,7 +2,7 @@ Changelog of lizard-waterregime
 ===================================================
 
 
-0.3.3 (unreleased)
+0.3.3 (2011-07-11)
 ------------------
 
 - Conformed code to pyflakes / pep8
