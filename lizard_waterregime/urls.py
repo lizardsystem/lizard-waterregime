@@ -2,12 +2,13 @@
 from django.conf.urls.defaults import *
 from django.conf import settings
 from django.contrib import admin
+from lizard_waterregime.views import StartView
 
 admin.autodiscover()
 
 urlpatterns = patterns('',
     url(r'^$',
-        'lizard_waterregime.views.start',
+        StartView.as_view(),
         name='waterregime_start'),
 
     # Search stuff.

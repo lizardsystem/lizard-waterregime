@@ -26,6 +26,7 @@ from lizard_map.daterange import current_start_end_dates
 #from lizard_map.models import Workspace
 from lizard_map.models import WorkspaceItem
 from lizard_map.animation import slider_layout_extra
+from lizard_map.views import AppView
 
 #from timeseries.timeseriesstub import TimeseriesStub
 #from timeseries.timeseriesstub import grouped_event_values
@@ -35,6 +36,22 @@ from lizard_map.animation import slider_layout_extra
 #import os
 
 from lizard_waterregime.models import WaterRegimeShape
+
+
+class StartView(AppView):
+    template_name = 'lizard_waterregime/lizard_waterregime.html'
+
+    def waterregime_shapes(self):
+        'not used'
+        return WaterRegimeShape.objects.all()
+
+    def crumbs(self):
+        'niet werkend'
+        crumbs = super(StartView, self).crumbs()
+        crumbs.append({'name': 'waterregime',
+                       'title': 'waterregime',
+                       'url': reverse('waterregime_start')})
+        return crumbs
 
 
 def start(request,
