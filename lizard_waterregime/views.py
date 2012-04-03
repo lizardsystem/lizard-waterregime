@@ -24,7 +24,7 @@ from django.template import RequestContext
 #from lizard_map.adapter import Graph
 from lizard_map.daterange import current_start_end_dates
 #from lizard_map.models import Workspace
-from lizard_map.models import WorkspaceItem
+from lizard_map.models import WorkspaceEditItem
 from lizard_map.animation import slider_layout_extra
 from lizard_map.views import AppView
 
@@ -44,14 +44,6 @@ class StartView(AppView):
     def waterregime_shapes(self):
         'not used'
         return WaterRegimeShape.objects.all()
-
-    def crumbs(self):
-        'niet werkend'
-        crumbs = super(StartView, self).crumbs()
-        crumbs.append({'name': 'waterregime',
-                       'title': 'waterregime',
-                       'url': reverse('waterregime_start')})
-        return crumbs
 
 
 def start(request,
@@ -107,7 +99,7 @@ def workspace_item_graph_image(request, workspace_item_id):
         # We want None, not u''.
         height = None
 
-    workspace_item = get_object_or_404(WorkspaceItem, pk=workspace_item_id)
+    workspace_item = get_object_or_404(WorkspaceEditItem, pk=workspace_item_id)
     start_date, end_date = current_start_end_dates(request)
 
     # add animation slider position
@@ -147,7 +139,7 @@ def workspace_item_bar_image(request, workspace_item_id):
         # We want None, not u''.
         height = None
 
-    workspace_item = get_object_or_404(WorkspaceItem, pk=workspace_item_id)
+    workspace_item = get_object_or_404(WorkspaceEditItem, pk=workspace_item_id)
     start_date, end_date = current_start_end_dates(request)
 
     # add animation slider position

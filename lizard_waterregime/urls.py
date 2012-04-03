@@ -6,18 +6,11 @@ from lizard_waterregime.views import StartView
 
 admin.autodiscover()
 
-urlpatterns = patterns('',
+urlpatterns = patterns(
+    '',
     url(r'^$',
         StartView.as_view(),
         name='waterregime_start'),
-
-    # Search stuff.
-    url(r'^search_coordinates/',
-        'lizard_map.views.search_coordinates',
-        name="lizard_map.search_coordinates"),
-    url(r'^search_name/',
-        'lizard_map.views.search_name',
-        name="lizard_map.search_name"),
 
     # Images other than the lizard-map default
     url(r'^workspace_item/(?P<workspace_item_id>\d+)/graph_image/',
