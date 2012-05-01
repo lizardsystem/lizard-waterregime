@@ -1,7 +1,8 @@
 # (c) Nelen & Schuurmans.  GPL licensed, see LICENSE.txt.
 from django.conf.urls.defaults import *
-from django.conf import settings
 from django.contrib import admin
+
+from lizard_ui.urls import debugmode_urlpatterns
 from lizard_waterregime.views import StartView
 
 admin.autodiscover()
@@ -19,12 +20,11 @@ urlpatterns = patterns(
     url(r'^workspace_item/(?P<workspace_item_id>\d+)/bar_image/',
         'lizard_waterregime.views.workspace_item_bar_image',
         name="lizard_waterregime.workspace_item_bar_image"),
+
+    # Enable these for local testing
+    #(r'', include('staticfiles.urls')),
+    #(r'^admin/', include(admin.site.urls)),
+    #(r'^map/', include('lizard_map.urls')),
 )
 
-
-if settings.DEBUG:
-    # Add this also to the projects that use this application
-    urlpatterns += patterns('',
-        (r'', include('staticfiles.urls')),
-        (r'^admin/', include(admin.site.urls)),
-    )
+urlpatterns += debugmode_urlpatterns()
