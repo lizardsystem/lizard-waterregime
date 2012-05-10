@@ -1,0 +1,28 @@
+{% extends "lizard_map/wms.html" %}
+{% load workspaces %}
+
+{% block subtitle %} Waterregime {% endblock %}
+
+{% block sidebar %}
+<div class="sidebarbox sidebarbox-stretched">
+  <h2>Waterregime</h2>
+    <ul class="without-bullets">
+      <li class="workspace-acceptable"
+          data-name="Regime-indicator"
+          data-adapter-class="adapter_waterregime"
+          data-adapter-layer-json='{"layer": "testlayername432"}'>
+        <a href="#">Regime-indicator</a>
+      </li>
+    </ul>
+</div>
+{% comment %}
+this is unused, imagine we wanted to include the waterregime_shapes method of the owner view object, we would name it like this:
+
+{{ view.waterregime_shapes }}
+
+{% endcomment %}
+
+{% workspace_edit view.workspace_edit %}
+{% collage_edit view.collage_edit %}
+
+{% endblock %}
