@@ -13,7 +13,9 @@ from django.core.cache import cache
 from lizard_fewsunblobbed.models import Filter
 from lizard_fewsunblobbed.models import Location
 from lizard_fewsunblobbed.models import Parameter
-from lizard_fewsunblobbed.models import Timeserie
+from lizard_fewsunblobbed.models import TimeStep
+from lizard_fewsunblobbed.models import ModuleInstance
+from lizard_fewsunblobbed.models import TimeSeriesKey
 
 
 class WaterRegimeShape(models.Model):
@@ -257,17 +259,19 @@ class FewsTimeSeries(models.Model, TimeSeries):
         fpk = Filter.objects.only('fews_id').get(fews_id=self.fid).pk
         lpk = Location.objects.only('id').get(id=self.lid).pk
         ppk = Parameter.objects.only('id').get(id=self.pid).pk
+        tpk = TimeStep.objects.only('id').get(id=self.timestep).pk
+        mpk = ModuleInstance.objects.only('id').get(id=self.moduleinstanceid).pk
 
-        timeseries = Timeserie.objects.get(
-            moduleinstanceid=self.moduleinstanceid,
-            timestep=self.timestep,
-            filterkey=fpk,
-            locationkey=lpk,
-            parameterkey=ppk)
+        timeseries = TimeSeriesKey.objects.get(
+            moduleinstance=mpk,
+            timestep=tpk,
+            filtertimeserieskey__filter=fpk,
+            location=lpk,
+            parameter=ppk)
 
-        for event in timeseries.timeseriedata.only('tsd_time', 'tsd_value').\
-            filter(tsd_time__range=(start, end)).order_by('tsd_time'):
-            yield event.tsd_time, event.tsd_value
+        for event in timeserie.timeseriesvaluesandflag_set.only('datetime', 'scalarvalue').\
+            filter(datetime__range=(start, end)).order_by('datetime'):
+            yield event.datetime, event.scalarvalue
 
     def __unicode__(self):
         return self.name
