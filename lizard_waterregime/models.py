@@ -256,6 +256,7 @@ class FewsTimeSeries(models.Model, TimeSeries):
     def raw_events(self, start=datetime.min, end=datetime.max):
         """
         """
+        print "#####", self.fid, self.lid, self.pid, self.timestep, self.moduleinstanceid
         fpk = Filter.objects.only('fews_id').get(fews_id=self.fid).pk
         lpk = Location.objects.only('id').get(id=self.lid).pk
         ppk = Parameter.objects.only('id').get(id=self.pid).pk
@@ -269,7 +270,7 @@ class FewsTimeSeries(models.Model, TimeSeries):
             location=lpk,
             parameter=ppk)
 
-        for event in timeserie.timeseriesvaluesandflag_set.only('datetime', 'scalarvalue').\
+        for event in timeseries.timeseriesvaluesandflag_set.only('datetime', 'scalarvalue').\
             filter(datetime__range=(start, end)).order_by('datetime'):
             yield event.datetime, event.scalarvalue
 
