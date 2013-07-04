@@ -124,12 +124,14 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
         # TODO remove hardcoded filename
         layer_filename = pkg_resources.resource_filename(
             'zzl',
+            'lizard_waterregime',
             'shapes/peilgebieden.shp')
 
         layer = mapnik.Layer('RegimeLayer', RD)
 
         layer.datasource = mapnik.Shapefile(
             file=layer_filename)
+        #import pdb; pdb.set_trace()
 
         style_name = 'waterregime_style'
 
@@ -139,7 +141,8 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
         # Refresh the p min e values in the database if necessary.
         RegimeCalculator.refresh(self.regimedatetime)
 
-        mapnik_style = self._mapnik_style(self.regimedatetime)
+        #mapnik_style = self._mapnik_style(self.regimedatetime)
+        mapnik_style = self._default_mapnik_style()
         styles[style_name] = mapnik_style
 
 #        db_settings = settings.DATABASES['default']

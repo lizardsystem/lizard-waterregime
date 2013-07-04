@@ -5,7 +5,7 @@ Changelog of lizard-waterregime
 0.3.4 (unreleased)
 ------------------
 
-- Nothing changed yet.
+- Upgraded to lizard 4
 
 
 0.3.3 (2011-07-11)
