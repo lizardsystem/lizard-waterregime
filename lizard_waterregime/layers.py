@@ -124,14 +124,13 @@ class AdapterWaterRegime(WorkspaceItemAdapter):
         # TODO remove hardcoded filename
         layer_filename = pkg_resources.resource_filename(
             'zzl',
-            'lizard_waterregime',
+            #'lizard_waterregime',
             'shapes/peilgebieden.shp')
 
         layer = mapnik.Layer('RegimeLayer', RD)
 
         layer.datasource = mapnik.Shapefile(
             file=layer_filename)
-        #import pdb; pdb.set_trace()
 
         style_name = 'waterregime_style'
 
